@@ -1,0 +1,128 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #0b0f0b;
+  color: #e9f0e4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#hud {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  min-width: 230px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(10, 14, 10, 0.58);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  user-select: none;
+}
+
+#hud .badge {
+  margin-bottom: 10px;
+  color: #b8c7a8;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#hud .speed {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+#hud .speed #speed {
+  font-size: 44px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+#hud .speed .unit {
+  color: #9fb18f;
+  font-size: 13px;
+}
+
+#hud .meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  color: #c8d5bd;
+  font-size: 12px;
+}
+
+#hud .meta .sep {
+  color: #64705a;
+}
+
+#hud .help {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8d9c81;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+#loading,
+#error {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: #0b0f0b;
+  color: #c8d5bd;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+#loading.hidden {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 240ms ease,
+    visibility 0s linear 240ms;
+}
+
+#error {
+  padding: 24px;
+  color: #ffb4a2;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+#error[hidden] {
+  display: none;
+}

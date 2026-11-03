@@ -244,12 +244,12 @@
 
 | 项 | 方案 |
 |---|---|
-| 引擎 | Unity 6 URP |
+| 引擎 | three.js + Rapier（WebGL2） |
 | 车辆物理 | 自定义射线悬挂 + 摩擦曲线，8 射线/轮，60 Hz 固定步长 |
-| 地形 | Heightmap + splat + 分层材质；车辙贴花，近场 Compute Shader 位移 |
-| 数据 | 手工摆点 + ScriptableObject 配置表 |
-| 联机 | Steamworks P2P + FishNet/NGO，主机权威，4 人 |
-| 存档 | 本地 + Steam 云，每玩家独立 profile |
+| 地形 | Heightmap + splat + 分层材质；车辙贴花，近场顶点位移 |
+| 数据 | 手工摆点 + JSON/TS 配置表 |
+| 联机 | WebRTC / WebSocket，主机权威，4 人 |
+| 存档 | 本地存储 + Steam 云（若上 Steam），每玩家独立 profile |
 | 团队 | 6–9 人（策划 1、程序 2–3、美术 3 含外包、音频外包、制作 1） |
 | 工期 | 14 个月到 1.0 |
 | 预算 | 国内约 ¥600–900 万，海外约 $1.2–1.8M |

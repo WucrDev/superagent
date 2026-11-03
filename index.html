@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f0b" />
+    <title>Superagent · 越野灰盒原型</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud" aria-live="polite">
+      <div class="badge">W1 骨架 · three.js + Rapier</div>
+      <div class="speed"><span id="speed">0</span><span class="unit">km/h</span></div>
+      <div class="meta">
+        <span id="device">键盘</span>
+        <span class="sep">/</span>
+        <span>60 Hz 物理</span>
+      </div>
+      <div class="help">
+        WASD 或手柄左摇杆驾驶 · RT/LT 油门/刹车 · Space 手刹 · R 复位 · 滚轮缩放
+      </div>
+    </div>
+
+    <div id="loading">正在加载物理引擎…</div>
+    <div id="error" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
