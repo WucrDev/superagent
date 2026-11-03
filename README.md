@@ -50,6 +50,8 @@
 - HUD：速度、档位、相机模式、输入设备；合成引擎音。
 
 验收自测与已知限制见 [`docs/w1-acceptance.md`](docs/w1-acceptance.md)。
+常驻制作人（兼策划）负责设计细节与验收，关键决策上报项目所有者；职责与流程见
+[`docs/game-producer.md`](docs/game-producer.md)。
 
 ## 常用命令
 
