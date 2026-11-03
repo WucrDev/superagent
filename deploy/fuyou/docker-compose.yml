@@ -1,0 +1,14 @@
+services:
+  web:
+    image: docker.m.daocloud.io/library/nginx:alpine
+    container_name: superagent-game-web
+    restart: always
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - fuyou_default
+
+networks:
+  fuyou_default:
+    external: true
