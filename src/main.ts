@@ -41,6 +41,12 @@ async function boot(): Promise<void> {
     await RAPIER.init();
 
     const renderer = createRenderer(app);
+    // A canvas tab stop makes the keyboard target explicit inside embedded
+    // webviews (Feishu) where the parent window can keep focus otherwise.
+    renderer.domElement.tabIndex = 0;
+    renderer.domElement.addEventListener('pointerdown', () => {
+      renderer.domElement.focus();
+    });
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x9fc3e8);
     scene.fog = new THREE.Fog(0x9fc3e8, 100, 420);
@@ -106,6 +112,16 @@ async function boot(): Promise<void> {
     };
     window.setTimeout(hideTutorial, 12000);
 
+    const focusHint = document.querySelector<HTMLElement>('#focusHint');
+    const setFocusHint = (visible: boolean): void => {
+      if (focusHint) focusHint.hidden = !visible;
+    };
+    // The card is visible at boot; the first click/key hides it. A blur (e.g.
+    // switching to Feishu) brings it back with the keyboard-paused explanation.
+    window.addEventListener('blur', () => setFocusHint(true));
+    window.addEventListener('pointerdown', () => setFocusHint(false));
+    window.addEventListener('keydown', () => setFocusHint(false));
+
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
         const sample = input.sample();
@@ -133,7 +149,14 @@ async function boot(): Promise<void> {
         cameraRig.update(frameTime, input);
         effects.update(frameTime, car);
         winch.sync(frameTime);
-        hud.update(car.speedKmh, car.gear, cameraRig.mode, input.device);
+        const water = track.waterAt(position.x, position.z);
+        hud.update(
+          car.speedKmh,
+          car.gear,
+          cameraRig.mode,
+          input.device,
+          water?.depth ?? 0,
+        );
         audio.update(car.speedKmh, lastThrottle, car.gear);
         renderer.render(scene, camera);
       },

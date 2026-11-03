@@ -30,6 +30,10 @@ body {
   height: 100%;
 }
 
+#app canvas:focus {
+  outline: none;
+}
+
 #hud {
   position: fixed;
   top: 20px;
@@ -95,6 +99,20 @@ body {
 
 #hud .meta .sep {
   color: #64705a;
+}
+
+#hud #water {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(63, 127, 154, 0.24);
+  color: #bfe3ef;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+#hud #water[hidden] {
+  display: none;
 }
 
 #hud .help {
@@ -241,6 +259,46 @@ body {
 #tutorial.hidden {
   opacity: 0;
   visibility: hidden;
+}
+
+/* Full-screen-ish focus card: embedded webviews (Feishu) and background tabs
+   stop delivering keydown events until the game surface is clicked. */
+#focusHint {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: min(440px, calc(100vw - 40px));
+  padding: 16px 22px;
+  border: 1px solid rgba(240, 195, 90, 0.55);
+  border-radius: 12px;
+  background: rgba(10, 14, 10, 0.9);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  color: #dbe6d2;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#focusHint[hidden] {
+  display: none;
+}
+
+#focusHint strong {
+  color: #f0c35a;
+  font-size: 16px;
+}
+
+#focusHint .focus-sub {
+  color: #9fb18f;
+  font-size: 11px;
 }
 
 /* W3 winch: compact prompt is always available; the full tension bar + angle

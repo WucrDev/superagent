@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-Hlx6nnhi.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、HUD 与收绳正常，无 console error）
+- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-BVFkGArs.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示与深水提示正常、HUD 与收绳正常，无 console error）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
 - 结论：**实现与客观自测通过；主观手感、硬件手柄震动、盲测视频待人工验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
@@ -55,6 +55,27 @@ After（锚点 C 5.6 m 自动选中）：![anchor C after](images/w3-anchor-c-af
 近距离但角度超出 60° 时的提示：![anchor C hint](images/w3-anchor-c-hint.png)
 
 线上 `index-Hlx6nnhi.js` 已验证：(0,200) 选中锚点 C、G 挂钩、F 拉动；(5,205) 提示“锚点在 1.9 m、132° · 按 X 手动选”；无 console error。旧页面若仍显示 W2 徽标需强刷；W3 徽标下若仍有异常，请告诉具体停点和朝向。
+
+### 第三次反馈：“按什么键都不行，水雾也不会停止”
+
+用户截图确认在 W3 build 里，车停在深水、锚点 C 前，画面没有绞盘提示，白雾持续。复核后是两个独立问题：
+
+1. **白雾不是卡死**：车在 80 cm 深水区，发动机进水会持续冒白烟，驶离水面后 10 s 恢复；它是 W2 的进水反馈，不是渲染或游戏循环卡死。
+2. **键盘事件没有到达游戏**：切到飞书/其他窗口后页面 `blur`，按键全部清空；飞书内置 webview、后台标签或未点过的 iframe 也会让 keydown 进不到页面，但渲染继续（所以白雾还在动）。修复：
+   - 启动/失焦时显示“点击画面继续”焦点卡；点击后隐藏。
+   - canvas 加 `tabIndex` 并在 pointerdown 时 `focus()`，让嵌入 webview 的键盘目标明确。
+   - HUD 深水提示：“深水 80 cm · 动力 -40% · 尽快驶出（进水后 10 s 恢复）”。
+   - 复测：点一下画面（焦点卡消失）→ WASD 应能开、F/G 应能瞄准；手机/平板没有物理键盘，请用电脑 Chrome/Safari 或接手柄。
+
+Before（旧版出生点，无焦点卡）：![focus before](images/w3-spawn.png)
+After（`index-BVFkGArs.js`，启动即显示焦点卡）：![focus after](images/w3-focus.png)
+
+Before（旧版深水，无 HUD 提示）：![water before](images/w3-anchor-c-after.png)
+After（深水提示 + 锚点 C）：![water after](images/w3-water-hint.png)
+
+**S 刹车/倒挡**：S 刹车实测有效（13.8 → 1.3 km/h）；倒挡当前没有实现（W1 变速箱只有 L/H），属于车辆/变速箱功能，已作为新 ticket 交回评估，不夹带进 W3。深水脱困可先用绞盘或掉头驶出。
+
+线上 `index-BVFkGArs.js` 已验证：焦点卡可见、点击隐藏、失焦重现；深水提示出现；锚点 C 可选中；无 console error。
 
 ## 实机候选与张力（当前 PR）
 

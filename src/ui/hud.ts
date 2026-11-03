@@ -13,6 +13,7 @@ export class Hud {
   private readonly gearElement: HTMLElement;
   private readonly cameraElement: HTMLElement;
   private readonly deviceElement: HTMLElement;
+  private readonly waterElement: HTMLElement;
   private lastUpdate = 0;
 
   constructor() {
@@ -20,6 +21,7 @@ export class Hud {
     this.gearElement = required('#gear');
     this.cameraElement = required('#camera');
     this.deviceElement = required('#device');
+    this.waterElement = required('#water');
   }
 
   update(
@@ -27,6 +29,7 @@ export class Hud {
     gear: Gear,
     camera: CameraMode,
     device: InputDevice,
+    waterDepth: number,
   ): void {
     const now = performance.now();
     if (now - this.lastUpdate < 100) return;
@@ -36,6 +39,16 @@ export class Hud {
     this.gearElement.textContent = gear;
     this.cameraElement.textContent = CAMERA_MODE_LABELS[camera];
     this.deviceElement.textContent = DEVICE_LABELS[device];
+
+    if (waterDepth > 0.5) {
+      this.waterElement.hidden = false;
+      this.waterElement.textContent = '深水 80 cm · 动力 -40% · 尽快驶出（进水后 10 s 恢复）';
+    } else if (waterDepth > 0.05) {
+      this.waterElement.hidden = false;
+      this.waterElement.textContent = '浅水 40 cm';
+    } else {
+      this.waterElement.hidden = true;
+    }
   }
 }
 
