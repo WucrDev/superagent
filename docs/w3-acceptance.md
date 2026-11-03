@@ -1,12 +1,12 @@
 # W3 绞盘验收自测（锚点、绳索、张力、失败态）
 
 - 日期：2026-11-04
-- 构建：W3 绞盘 PR HEAD（单键交互修复版；基于 `main` 8e18123）
+- 构建：W3 绞盘 PR HEAD（单键交互 + 倒挡修复版；基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-6oAXVZPm.js`；单键交互尚未部署，headless 验证使用本地 `npm run preview` 的 build）
-- 自测命令：`npm ci`、`npm run typecheck`、`npm test`（45 tests）、`npm run build`
+- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-6oAXVZPm.js`；单键交互与合并后的倒挡尚未部署，headless 验证使用本地 `npm run preview` 的 build）
+- 自测命令：`npm ci`、`npm run typecheck`、`npm test`（49 tests）、`npm run build`
 - 交付状态：**PR #43 为可审状态（前一轮设置；本轮 agent 未改 PR 状态、未合并、未部署）**。单键交互修复已完成自测；独立验收待安排，通过后才可合并。
-- 结论：**实现与客观自测通过；制作人验收未通过；单键交互修复已通过 headless 预检，主观手感、操作可懂度、飞书焦点/输入法、硬件手柄震动、盲测视频仍待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
+- 结论：**实现与客观自测通过；制作人验收未通过；单键交互与倒挡已通过 headless 预检，主观手感、操作可懂度、飞书焦点/输入法、硬件手柄震动、盲测视频仍待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
 ## 验收对照
 
@@ -76,7 +76,7 @@ After（`index-BVFkGArs.js`，启动即显示焦点卡）：![focus after](image
 Before（旧版深水，无 HUD 提示）：![water before](images/w3-anchor-c-after.png)
 After（深水提示 + 锚点 C）：![water after](images/w3-water-hint.png)
 
-**S 刹车/倒挡**：S 刹车实测有效（14.1 → 1.7 km/h）；停住后继续按住 S 进入倒挡，HUD 显示 R，倒挡限速 15 km/h；深水 (0,200) 实测倒出到 z=189.1，松开 S 回 L。该倒挡按 owner 要求在同一 PR 补齐（自动倒挡；W1 原 L/H 变速箱未新增物理档位）。
+**S 刹车/倒挡**：S 刹车实测有效（14.1 → 1.7 km/h）；停住后继续按住 S 进入倒挡，HUD 显示 R，倒挡限速约 12 km/h；深水 (0,200) 实测倒出到 z=189.1，松开 S 回 L。该倒挡按 owner 要求在同一 PR 补齐（自动倒挡；W1 原 L/H 变速箱未新增物理档位）。
 
 线上 `index-BVFkGArs.js` 已验证：焦点卡可见、点击隐藏、失焦重现；深水提示出现；锚点 C 可选中；无 console error。
 
@@ -115,7 +115,7 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 
 - `npm run typecheck` 通过。
 - `npm test`：45 tests 通过（新增 3 项：G 单击挂钩、F 收绳 + G 松绳、60° 外锚点用 X 选中；原有绞盘集成测试改为不按 F 直接 G）。
-- `npm run build` 通过（`index-Bu6tZEcz.js`）。
+- `npm run build` 通过（`index-C_E-i2Xi.js`）。
 - Chrome 156 headless（CDP，1280×720，`npm run preview` 的 build）实测：
   - 无输入：`state=ready`，自动选中“起手锚点（练习）”，提示 `G 挂钩 · 起手锚点（练习） · X 换锚`。
   - 单按 G（不按 F）：`state=attached`，提示 `已挂钩 · G 松绳 · 按住 F 收绳 · 起手锚点（练习） · 绳松`。
@@ -129,9 +129,41 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 
 **仍待人工/独立验收**：飞书内嵌 webview 的键盘焦点和中文输入法行为无法在 headless 复现；单键交互的可懂度、手感与“挂上没有”的主观确认仍需制作人独立试玩。
 
+### 倒挡补充（owner 追加，2026-11-04）
+
+**需求**：缺少倒挡。静止时按住 S 进入 R，HUD 档位显示 R；行驶中 S 仍是刹车；倒车限速 10–15 km/h；L/H 不变。
+
+**实现**：
+
+- 输入不变：S 仍是 `brake`。车速 ≤ 0.6 m/s 且持续按住 S 0.45 s 后接合 `R`；W/油门、Q/E 换挡、松开 S 立即退出 R。
+- 倒挡使用反向驱动力，目标上限 12 km/h（`REVERSE_MAX_SPEED`），下坡有轻微 governor（实测坡道短时约 14 km/h，仍在 10–15 区间）；R 状态下不再施加刹车力（S 变成倒车油门）。
+- HUD 档位增加 `R`；README 操作表、游戏内帮助、W1 验收补倒挡说明。
+- 前进 L/H 的换挡逻辑、扭矩与限速未改。
+
+**验证**：
+
+- `npm test`：49 tests 通过。新增/更新：
+  - `RaycastVehicle > brakes with S while rolling forward and does not engage R`
+  - `RaycastVehicle > engages R when S is held at a standstill and caps reverse speed`
+  - `HUD gear display > shows R for reverse and keeps the forward gear labels`
+  - `surface feel` 的制动距离改为“停稳即停测”，避免继续按住 S 后倒车污染旧数据；四种材质阈值仍通过。
+- `npm run typecheck` 通过；`npm run build` 通过（`index-DhGBd8AF.js`）。
+- Chrome 156 headless（CDP，本地 `npm run preview` 的 build）实测：
+  - 静止按住 S：`gear=R`，HUD `#gear` 文本为 `R`；0.8 s 倒车约 5–6 km/h。
+  - 行驶中（约 25.8 km/h）按 S 0.35 s：仍为 `L`，速度降到约 12.2 km/h，未进入 R。
+  - 继续按住 S：接合 R；平路 2.5 s 约 12 km/h，坡道约 14.3 km/h（≤15）。
+  - 松开 S：立即回到 `L`，倒车惯性保留后自然衰减。
+  - console error 0。
+
+静止按住 S，HUD 档位显示 `R`、速度约 12 km/h：![reverse R](images/w3-reverse-r.png)
+
+**仍待人工/独立验收**：倒挡手感（接合时机、倒车速度、坡道倒车）与飞书焦点/输入法仍需制作人独立试玩；本 agent 未部署、未改 PR 状态。
+
+说明：断绳/拉不动的实机截图仍需固定车身做故障注入（当前地形自然持续陷车不足）；S 倒挡已在本轮补上，见上文「倒挡补充」。
+
 ## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）
 
-> 本节记录的是**单键交互修复前**的上一版 build（仍需按住 F 瞄准）；当前交互见上文「第五次反馈」。
+> 本节记录的是**单键交互修复前**的上一版 build（仍需按住 F 瞄准）；当前交互见上文「第五次反馈」。表中倒挡行为来自上一版自动倒挡（限速 15 km/h），合并后的统一实现见「倒挡补充」。
 
 同一 Chrome 156 headless、1280×720、线上 build；按制作人清单实际试玩：
 
@@ -169,7 +201,7 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 ## 复现步骤
 
 1. `npm ci && npm run dev`，打开 `http://127.0.0.1:5173/`。
-2. 控制：`G` 挂钩/松绳（无绳时自动显示最佳锚点）；按住 `F` 收绳；`X` 切换手动锚；`V` 回自动；`J` 翻正；`H` 开关张力条 + 角度环；`R` 复位。按键没反应时先点一下画面，并把输入法切到英文。
+2. 控制：`G` 挂钩/松绳（无绳时自动显示最佳锚点）；按住 `F` 收绳；`X` 切换手动锚；`V` 回自动；`S` 刹车，停稳后继续按住进入倒挡 `R`（≤12 km/h）；`J` 翻正；`H` 开关张力条 + 角度环；`R` 复位。按键没反应时先点一下画面，并把输入法切到英文。
 3. 浏览器控制台：
    - 绞盘试炼：`__superagent.car.place(50, 147, 0)`，等自动选锚后直接按 G；按住 F 收绳。
    - 弱木桩：`__superagent.winch.selectAnchor('pad-stump')`，按 G；约 1.5 s 后断。
@@ -177,7 +209,7 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
    - 跨水：`__superagent.car.place(69, 153, 0.44)`，`__superagent.winch.selectAnchor('stream-tree')`，按 G；按住 F 收绳。
    - 侧翻：`__superagent.car.rigidBody.setRotation({x:0,y:0,z:0.7071,w:0.7071}, true)`，按住 J 10 s。
    - 断绳/拉不动的故障注入：挂上后 `__superagent.car.rigidBody.setBodyType(1, true)`（固定车身）再按住 F；用完 `setBodyType(0, true)` 恢复。
-4. 单元/集成：`npx vitest run src/tools/winchMath.test.ts src/tools/rope.test.ts src/tools/winch.test.ts`。
+4. 单元/集成：`npx vitest run src/tools/winchMath.test.ts src/tools/rope.test.ts src/tools/winch.test.ts src/vehicle/raycastVehicle.test.ts src/ui/hud.test.ts`。
 
 ## 截图
 

@@ -1,3 +1,5 @@
+import type { Gear } from '../vehicle/drivetrain';
+
 /**
  * Tiny synthesized engine/shift audio for W1 #3.
  *
@@ -88,13 +90,14 @@ export class EngineAudio {
     }
   }
 
-  update(speedKmh: number, throttle: number, gear: 'L' | 'H'): void {
+  update(speedKmh: number, throttle: number, gear: Gear): void {
     if (!this.context || !this.engine || !this.engineGain || !this.filter) return;
     if (this.muted) {
       this.engineGain.gain.setTargetAtTime(0, this.context.currentTime, 0.05);
       return;
     }
-    const targetFrequency = 48 + speedKmh * 1.35 + (gear === 'L' ? 14 : 0);
+    const gearTone = gear === 'L' ? 14 : gear === 'H' ? 0 : 8;
+    const targetFrequency = 48 + speedKmh * 1.35 + gearTone;
     this.engine.frequency.setTargetAtTime(targetFrequency, this.context.currentTime, 0.06);
     this.filter.frequency.setTargetAtTime(
       380 + speedKmh * 14,

@@ -32,8 +32,9 @@ const BRAKE_FORCE = 18000;
 // Automatic reverse: hold S after the car has stopped. A short delay prevents
 // the brake at a normal stop from immediately turning into reverse.
 const REVERSE_FORCE = 6500;
-const REVERSE_MAX_SPEED = 4.2; // 15 km/h
-const REVERSE_DELAY = 0.45;
+const REVERSE_MAX_SPEED = 12 / 3.6; // 12 km/h (owner range 10-15 km/h)
+const REVERSE_ENGAGE_SPEED = 0.6; // m/s: must be near standstill
+const REVERSE_ENGAGE_DELAY = 0.45; // s: holding S at rest before R engages
 const LATERAL_GRIP = 7.5;
 const YAW_DAMPING = 900;
 const PITCH_ROLL_DAMPING = 500;
@@ -110,8 +111,8 @@ export class RaycastVehicle {
   private dominantSurface: Surface = SURFACES.dirt;
   private winchAssist = 1;
   private winchLoad = 0;
-  private reverseTimer = 0;
-  private reversing = false;
+  private reverse = false;
+  private reverseHold = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -151,13 +152,18 @@ export class RaycastVehicle {
     this.sync(0);
   }
 
-  get gear(): 'L' | 'H' {
-    return this.drivetrain.gear;
+  get gear(): Gear {
+    return this.reverse ? 'R' : this.drivetrain.gear;
+  }
+
+  /** True while holding S at a standstill has engaged reverse. */
+  get isReversing(): boolean {
+    return this.reverse;
   }
 
   /** HUD gear: L/H, or R while the automatic reverse is engaged. */
-  get displayGear(): Gear | 'R' {
-    return this.reversing ? 'R' : this.drivetrain.gear;
+  get displayGear(): Gear {
+    return this.gear;
   }
 
   get speedKmh(): number {
@@ -289,8 +295,6 @@ export class RaycastVehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.winchAssist = 1;
     this.winchLoad = 0;
-    this.reverseTimer = 0;
-    this.reversing = false;
     this.sync(0);
   }
 
@@ -298,6 +302,9 @@ export class RaycastVehicle {
     this.drivetrain.update(dt);
     this.lastSteer = input.steer;
 
+    // Any Q/E shift input selects a forward range again; L/H shifting itself
+    // stays exactly as before.
+    if (input.shiftUp || input.shiftDown) this.disengageReverse();
     if (input.shiftUp && this.drivetrain.shiftUp()) this.onShift?.();
     if (input.shiftDown && this.drivetrain.shiftDown()) this.onShift?.();
 
@@ -309,6 +316,7 @@ export class RaycastVehicle {
 
     const velocity = this.body.linvel();
     const speed = velocity.x * chassisForward.x + velocity.y * chassisForward.y + velocity.z * chassisForward.z;
+    this.updateReverse(dt, input, speed);
 
     // W2 #7 / issue #13: deep water (> 50 cm) floods the intake; power drops
     // 40 % and recovers over 10 s once the car is back on dry ground.
@@ -330,38 +338,37 @@ export class RaycastVehicle {
       );
     }
 
-    // Automatic reverse: S brakes while moving, then (after a short hold at a
-    // stop) becomes reverse throttle. This keeps one pedal for brake + reverse;
-    // the HUD shows R and the force is capped at walking pace.
-    const braking = input.brake > 0.5 && input.throttle < 0.1;
-    if (this.reversing) {
-      if (input.brake < 0.1 || input.throttle > 0.1) this.reversing = false;
-    } else if (braking && Math.abs(speed) < 0.6) {
-      this.reverseTimer += dt;
-      if (this.reverseTimer >= REVERSE_DELAY) this.reversing = true;
-    } else {
-      this.reverseTimer = 0;
-    }
-
-    const gearMax = this.drivetrain.maxSpeed;
-    const torqueFactor = this.drivetrain.shifting ? 0 : this.drivetrain.torqueFactor;
-    let engineForce =
-      input.throttle *
-      ENGINE_FORCE *
-      torqueFactor *
-      (1 - 0.4 * this.waterIngressLevel) *
-      this.winchAssist *
-      clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
-    let perWheelBrake = (input.brake * BRAKE_FORCE) / WHEELS.length;
-    if (this.reversing) {
+    const powerFactor = 1 - 0.4 * this.waterIngressLevel;
+    let engineForce: number;
+    if (this.reverse) {
+      // S becomes reverse throttle at a standstill; cap the reverse speed and
+      // keep the same water/winch power modifiers as forward drive.
       const reverseSpeed = Math.max(0, -speed);
+      const overspeed = Math.max(0, reverseSpeed - REVERSE_MAX_SPEED);
       engineForce =
-        -REVERSE_FORCE *
-        input.brake *
-        clamp((REVERSE_MAX_SPEED - reverseSpeed) / 0.6, 0, 1);
-      perWheelBrake = 0;
+        -input.brake *
+          REVERSE_FORCE *
+          powerFactor *
+          this.winchAssist *
+          clamp((REVERSE_MAX_SPEED - reverseSpeed) / 0.6, 0, 1) +
+        // A light governor keeps a downhill roll from running away past the
+        // 12 km/h reverse cap while S is still held.
+        Math.min(overspeed * 2000, ENGINE_FORCE);
+    } else {
+      const gearMax = this.drivetrain.maxSpeed;
+      const torqueFactor = this.drivetrain.shifting ? 0 : this.drivetrain.torqueFactor;
+      engineForce =
+        input.throttle *
+        ENGINE_FORCE *
+        torqueFactor *
+        powerFactor *
+        this.winchAssist *
+        clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
     }
     const perWheelDrive = engineForce / DRIVEN_WHEELS;
+    // While reversing, S is the reverse pedal, not the brake. Braking while
+    // rolling forward is unchanged.
+    const perWheelBrake = this.reverse ? 0 : (input.brake * BRAKE_FORCE) / WHEELS.length;
     const handbrakeForce = input.handbrake ? (BRAKE_FORCE * 1.15) / WHEELS.length : 0;
 
     for (let index = 0; index < WHEELS.length; index += 1) {
@@ -426,11 +433,10 @@ export class RaycastVehicle {
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.drivetrain.reset();
+    this.disengageReverse();
     this.forwardSpeed = 0;
     this.lastSteer = 0;
     this.waterIngressLevel = 0;
-    this.reverseTimer = 0;
-    this.reversing = false;
     this.slopeAngle = 0;
     this.maxSlip = 0;
     this.dominantSurface = SURFACES.dirt;
@@ -456,10 +462,41 @@ export class RaycastVehicle {
     this.body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.disengageReverse();
     this.forwardSpeed = 0;
-    this.reverseTimer = 0;
-    this.reversing = false;
     this.sync(0);
+  }
+
+  /**
+   * Reverse engagement: S brakes while the car is rolling; once it is at rest
+   * and S is still held for 0.45 s, reverse engages. W/throttle, Q/E shifts or
+   * releasing S leave reverse immediately. L/H forward behavior is untouched.
+   */
+  private updateReverse(dt: number, input: DrivingInput, speed: number): void {
+    if (this.reverse) {
+      if (input.brake < 0.05 || input.throttle > 0.05 || speed > 1.5) {
+        this.disengageReverse();
+      }
+      return;
+    }
+    if (
+      input.brake >= 0.5 &&
+      input.throttle < 0.05 &&
+      Math.abs(speed) <= REVERSE_ENGAGE_SPEED
+    ) {
+      this.reverseHold += dt;
+      if (this.reverseHold >= REVERSE_ENGAGE_DELAY) {
+        this.reverse = true;
+        this.reverseHold = 0;
+      }
+      return;
+    }
+    this.reverseHold = 0;
+  }
+
+  private disengageReverse(): void {
+    this.reverse = false;
+    this.reverseHold = 0;
   }
 
   private updateWheel(

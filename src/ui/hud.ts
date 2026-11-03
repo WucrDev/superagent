@@ -8,6 +8,13 @@ const DEVICE_LABELS: Record<InputDevice, string> = {
   none: '键盘',
 };
 
+/** HUD gear readout: L/H forward ranges plus the temporary reverse range. */
+export const GEAR_LABELS: Record<Gear, string> = {
+  L: 'L',
+  H: 'H',
+  R: 'R',
+};
+
 export class Hud {
   private readonly speedElement: HTMLElement;
   private readonly gearElement: HTMLElement;
@@ -36,7 +43,7 @@ export class Hud {
     this.lastUpdate = now;
 
     this.speedElement.textContent = String(Math.round(speedKmh));
-    this.gearElement.textContent = gear;
+    this.gearElement.textContent = GEAR_LABELS[gear];
     this.cameraElement.textContent = CAMERA_MODE_LABELS[camera];
     this.deviceElement.textContent = DEVICE_LABELS[device];
 
