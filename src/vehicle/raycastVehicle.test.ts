@@ -2,7 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { DrivingInput } from '../core/input';
-import { PlaceholderCar } from './placeholderCar';
+import { RaycastVehicle } from './raycastVehicle';
 
 const STEP = 1 / 60;
 
@@ -12,10 +12,13 @@ const IDLE: DrivingInput = {
   steer: 0,
   handbrake: false,
   reset: false,
+  shiftUp: false,
+  shiftDown: false,
+  camera: false,
 };
 
 interface Rig {
-  car: PlaceholderCar;
+  car: RaycastVehicle;
   world: RAPIER.World;
 }
 
@@ -27,15 +30,18 @@ function createRig(): Rig {
   const ground = world.createRigidBody(
     RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0),
   );
-  world.createCollider(RAPIER.ColliderDesc.cuboid(100, 0.5, 100), ground);
+  world.createCollider(
+    RAPIER.ColliderDesc.cuboid(100, 0.5, 100).setFriction(1.0),
+    ground,
+  );
 
-  return { car: new PlaceholderCar(scene, world), world };
+  return { car: new RaycastVehicle(scene, world), world };
 }
 
 function simulate(rig: Rig, input: DrivingInput, seconds: number): void {
   const steps = Math.round(seconds / STEP);
   for (let i = 0; i < steps; i += 1) {
-    rig.car.applyInput(STEP, input);
+    rig.car.update(STEP, input);
     rig.world.step();
     rig.car.sync(STEP);
   }
@@ -45,20 +51,27 @@ beforeAll(async () => {
   await RAPIER.init();
 });
 
-describe('PlaceholderCar', () => {
-  it('accelerates forward when throttle is applied', () => {
+describe('RaycastVehicle', () => {
+  it('settles on its suspension and accelerates on throttle', () => {
     const rig = createRig();
-    simulate(rig, { ...IDLE, throttle: 1 }, 2);
+    simulate(rig, IDLE, 1);
+    const settledY = rig.car.position.y;
+    expect(settledY).toBeGreaterThan(0.6);
+    expect(settledY).toBeLessThan(1.1);
 
+    simulate(rig, { ...IDLE, throttle: 1 }, 2);
     expect(rig.car.speedKmh).toBeGreaterThan(10);
     expect(rig.car.position.z).toBeGreaterThan(1);
   });
 
-  it('does not steer while standing still', () => {
+  it('shifts from L to H with a power interruption', () => {
     const rig = createRig();
-    simulate(rig, { ...IDLE, steer: 1 }, 1);
-
-    expect(Math.abs(rig.car.forward.x)).toBeLessThan(0.05);
+    simulate(rig, IDLE, 1);
+    rig.car.update(STEP, { ...IDLE, shiftUp: true });
+    expect(rig.car.gear).toBe('H');
+    expect(rig.car.drivetrain.shifting).toBe(true);
+    simulate(rig, IDLE, 0.4);
+    expect(rig.car.drivetrain.shifting).toBe(false);
   });
 
   it('reset returns the car to the spawn point and clears speed', () => {

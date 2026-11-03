@@ -1,23 +1,15 @@
-# superagent｜越野灰盒原型
+# superagent｜越野灰盒原型（W1 可玩 build）
 
-“一辆车、一段烂路、一根绞盘”的越野灰盒原型。当前是 **W1 工程骨架**：three.js + Rapier，浏览器直接运行，不需要安装游戏引擎。
+“一辆车、一段烂路、一根绞盘”的越野灰盒原型。W1 目标：**能开**。
+当前版本是 three.js + Rapier 的浏览器可玩构建，不需要安装游戏引擎。
 
-![W1 骨架运行截图：占位车、起点线与 HUD](docs/images/w1-web-skeleton.png)
+![第三人称视角](docs/images/w1-chase.png)
 
-## 技术栈
+![座舱视角 blockout](docs/images/w1-cockpit.png)
 
-| 项 | 方案 |
-|---|---|
-| 渲染 | three.js（WebGL2） |
-| 物理 | Rapier 3D（WASM），60 Hz 固定步长 |
-| 工程 | Vite + TypeScript，npm 锁版本（`package-lock.json`） |
-| 美术 | glTF / GLB + 贴图，大文件走 Git LFS |
-| 输入 | 统一 InputManager：键盘 + 鼠标（滚轮）+ Gamepad API |
+[60 秒录屏（L 档爬坡 / 三视角 / H 档泥坡打滑）](docs/w1-playthrough.mp4)
 
-原 Unity 方案已按项目所有者决定废弃，决策记录见
-[`docs/adr/0001-web-stack-threejs.md`](docs/adr/0001-web-stack-threejs.md)。
-
-## 快速开始（目标：15 分钟内跑起来）
+## 快速开始
 
 1. 安装 **Node.js 22 LTS**（或 ≥ 22.12）与 npm。
 2. 安装并初始化 Git LFS（美术资产需要）：
@@ -27,17 +19,37 @@
    git lfs install
    ```
 
-3. 安装依赖并启动开发服务器：
+3. 安装依赖并启动：
 
    ```bash
-   npm ci          # 或 npm install
+   npm ci
    npm run dev     # 打开 http://127.0.0.1:5173/
    ```
 
-4. 操作：
-   - **键盘**：WASD / 方向键驾驶，Space 手刹，R 复位；
-   - **手柄**：左摇杆转向，RT 油门，LT 刹车，A 手刹，Start 复位；
-   - **鼠标**：滚轮缩放第三人称相机。
+## 操作
+
+| 输入 | 动作 |
+|---|---|
+| WASD / 方向键 | 油门、刹车、转向 |
+| 手柄左摇杆 / RT / LT | 转向、油门、刹车 |
+| Q / E 或 手柄 LB / RB | L 档 / H 档（0.3 s 动力中断） |
+| C 或 手柄 Y | 切换第三人称 / 自由 / 座舱 |
+| Space 或 手柄 A | 手刹（坡起不溜车） |
+| R 或 手柄 Start | 复位到起点 |
+| 鼠标右键拖动 | 自由 / 座舱视角环视 |
+| 滚轮 | 相机距离 |
+| Esc | 手柄死区、转向灵敏度、FOV 设置 |
+
+## W1 已实现（#1–#5）
+
+- **工程骨架**（#1 / issue #7）：Vite + TypeScript，npm 锁版本，60 Hz 固定步长，Git LFS。
+- **射线悬挂车辆**（#2 / issue #8）：每轮 8 条射线、弹簧-阻尼、上下限位；车身质量/重心可配。
+- **两档变速箱**（#3 / issue #9）：L 0–35 km/h、H 0–90 km/h，换档 0.3 s 动力中断 + 合成换档音；手刹坡起。
+- **相机与输入**（#4 / issue #10）：第三人称跟随、自由环视、座舱 blockout（仪表台/方向盘/座椅/A 柱/门板/后视镜），死区与灵敏度设置。
+- **白盒测试场**（#5 / issue #11）：800×800 m，包含 8° 缓坡、40 cm 浅水、岩石堆、30°/35° 泥坡、2 m 沟、80 cm 深水、3 个绞盘锚点。
+- HUD：速度、档位、相机模式、输入设备；合成引擎音。
+
+验收自测与已知限制见 [`docs/w1-acceptance.md`](docs/w1-acceptance.md)。
 
 ## 常用命令
 
@@ -46,34 +58,28 @@
 | `npm run dev` | 本地开发服务器（HMR） |
 | `npm run build` | 类型检查 + 生产构建到 `dist/` |
 | `npm run preview` | 预览生产构建 |
-| `npm test` | Vitest 单元测试（时钟 + 车辆物理） |
-| `npm run typecheck` | 只做 TypeScript 检查 |
+| `npm test` | Vitest 单元测试（时钟 + 射线悬挂车辆） |
+| `npm run typecheck` | TypeScript 检查 |
 
 ## 目录
 
 ```
 src/
-  core/       # 固定步长循环、输入、渲染器、数学工具
-  vehicle/    # 车辆与跟随相机（当前为占位车）
-  terrain/    # 测试场地形
-  tools/      # 绞盘、木板、千斤顶、编辑器工具（后续）
-  ui/         # HUD
-docs/         # 设计、排期与决策记录
-docs/images/  # 运行截图
+  core/       # 固定步长循环、输入、渲染器、音频、数学工具
+  vehicle/    # 8 射线悬挂车辆、两档变速箱、相机与座舱
+  terrain/    # 800×800 白盒测试场
+  tools/      # 绞盘、木板、千斤顶等（W3/W4）
+  ui/         # HUD、设置面板
+docs/         # 设计、排期、验收与决策记录
 ```
 
-## 当前进度
+## 明确不在 W1 范围
 
-- [x] **W1 #1 / issue #7**：工程骨架、60 Hz 固定步长、Input System（键盘/手柄）、可运行占位车
-- [ ] W1 #2 / issue #8：8 射线弹簧-阻尼悬挂（替换占位车）
-- [ ] W1 #3 / issue #9：两档变速箱与动力
-- [ ] W1 #4 / issue #10：第三人称 / 自由 / 座舱相机与输入设置
-- [ ] W1 #5 / issue #11：白盒测试场 v0
+- W2：四种路面材质/抓地曲线、坡度与涉水物理、打滑粒子、完整 HUD。
+- W3：绞盘锚点检测、绳索、张力、失败态。
+- W4：木板、千斤顶、维修包、工具轮盘。
+- 35° 泥坡与 2 m 沟是故意留给后续工具的障碍；W1 车辆不保证直接通过。
+- 座舱目前是 blockout，比例最终要与测试车外模叠合（W5 验收）。
 
-> 占位车只是为了让骨架能端到端验证“输入 → 60 Hz 物理 → 渲染 → HUD”。
-> 真正的车辆手感从 W1 #2 开始，不要在占位车上继续加功能。
-
-## 验收（issue #7）
-
-- 新成员 clone 后 15 分钟内能跑起来；
-- `npm run typecheck`、`npm test`、`npm run build` 通过，无警告。
+W1–W6 计划见 [`docs/sprint-w1-w6.md`](docs/sprint-w1-w6.md)，技术栈决策见
+[`docs/adr/0001-web-stack-threejs.md`](docs/adr/0001-web-stack-threejs.md)。

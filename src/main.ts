@@ -1,22 +1,25 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import './style.css';
+import { EngineAudio } from './core/audio';
 import { InputManager } from './core/input';
 import { GameLoop } from './core/loop';
 import { createRenderer } from './core/renderer';
-import { createTestGround } from './terrain/testGround';
+import { createTestTrack } from './terrain/testTrack';
 import { Hud } from './ui/hud';
-import { FollowCamera } from './vehicle/followCamera';
-import { PlaceholderCar } from './vehicle/placeholderCar';
+import { SettingsPanel } from './ui/settingsPanel';
+import { CameraRig } from './vehicle/cameraRig';
+import { RaycastVehicle } from './vehicle/raycastVehicle';
 
 const FIXED_STEP = 1 / 60;
 
 declare global {
   interface Window {
     __superagent?: {
-      car: PlaceholderCar;
+      car: RaycastVehicle;
       world: RAPIER.World;
       input: InputManager;
+      cameraRig: CameraRig;
     };
   }
 }
@@ -33,28 +36,28 @@ async function boot(): Promise<void> {
     const renderer = createRenderer(app);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x9fc3e8);
-    scene.fog = new THREE.Fog(0x9fc3e8, 90, 320);
+    scene.fog = new THREE.Fog(0x9fc3e8, 100, 420);
 
     const camera = new THREE.PerspectiveCamera(
-      60,
+      65,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000,
+      1200,
     );
 
-    const hemisphere = new THREE.HemisphereLight(0xd6e6ff, 0x46513a, 1.6);
+    const hemisphere = new THREE.HemisphereLight(0xd6e6ff, 0x46513a, 1.55);
     scene.add(hemisphere);
 
     const sun = new THREE.DirectionalLight(0xfff0d0, 2.8);
     sun.position.set(40, 60, 25);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -60;
-    sun.shadow.camera.right = 60;
-    sun.shadow.camera.top = 60;
-    sun.shadow.camera.bottom = -60;
+    sun.shadow.camera.left = -70;
+    sun.shadow.camera.right = 70;
+    sun.shadow.camera.top = 70;
+    sun.shadow.camera.bottom = -70;
     sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 180;
+    sun.shadow.camera.far = 220;
     sun.shadow.bias = -0.0004;
     scene.add(sun);
     scene.add(sun.target);
@@ -62,29 +65,41 @@ async function boot(): Promise<void> {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     world.timestep = FIXED_STEP;
 
-    createTestGround(scene, world);
-    const car = new PlaceholderCar(scene, world);
+    createTestTrack(scene, world);
+
+    const audio = new EngineAudio();
+    const startAudio = (): void => audio.start();
+    window.addEventListener('keydown', startAudio, { once: true });
+    window.addEventListener('pointerdown', startAudio, { once: true });
+
+    const car = new RaycastVehicle(scene, world, () => audio.shift());
     const input = new InputManager({ deadzone: 0.15, steerSensitivity: 1 });
-    const follow = new FollowCamera(camera);
+    const cameraRig = new CameraRig(camera, car);
+    new SettingsPanel(input, cameraRig);
     const hud = new Hud();
-    follow.snap(car);
+
+    let lastThrottle = 0;
 
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
         const sample = input.sample();
+        lastThrottle = sample.throttle;
         if (sample.reset) car.reset();
-        car.applyInput(step, sample);
+        if (sample.camera) cameraRig.cycle();
+        car.update(step, sample);
         world.step();
         car.sync(step);
       },
       render: (_alpha, frameTime) => {
+        car.group.updateMatrixWorld(true);
         const position = car.position;
         sun.position.set(position.x + 40, 60, position.z + 25);
         sun.target.position.set(position.x, 0, position.z);
         sun.target.updateMatrixWorld();
 
-        follow.update(frameTime, car);
-        hud.update(car.speedKmh, input.device);
+        cameraRig.update(frameTime, input);
+        hud.update(car.speedKmh, car.gear, cameraRig.mode, input.device);
+        audio.update(car.speedKmh, lastThrottle, car.gear);
         renderer.render(scene, camera);
       },
     });
@@ -95,7 +110,7 @@ async function boot(): Promise<void> {
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    window.__superagent = { car, world, input };
+    window.__superagent = { car, world, input, cameraRig };
     loop.start();
     loading.classList.add('hidden');
   } catch (cause) {
