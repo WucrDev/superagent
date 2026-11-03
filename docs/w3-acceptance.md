@@ -5,7 +5,8 @@
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
 - 线上 build：<https://game.xiaoannurse.art/>（同一 `index-WZcO526t.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示正常、HUD 与收绳正常，无 console error）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
-- 结论：**实现与客观自测通过；主观手感、硬件手柄震动、盲测视频待人工验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
+- 交付状态：**PR #43 已转回 draft**。制作人检查执行失败：worker 把“自检清单 + 客观测试通过”当成了制作人验收，没有按 `docs/game-producer.md` 做实际试玩与操作验证，误报 ready。W3 未通过验收，独立验收待安排。
+- 结论：**实现与客观自测通过；制作人验收未通过；主观手感、操作可懂度、硬件手柄震动、盲测视频待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
 ## 验收对照
 
