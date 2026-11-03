@@ -121,6 +121,24 @@ function accelerateTo(rig: Rig, targetKmh: number, maxSeconds = 8): number {
 }
 
 /**
+ * Brake distance = furthest forward point reached. Holding S keeps braking
+ * after the stop and then engages reverse, so the final position is behind the
+ * stop point; the stopping distance is the maximum, not the end position.
+ */
+function brakeDistance(rig: Rig, seconds = 8): number {
+  const startZ = rig.car.position.z;
+  let maxZ = startZ;
+  const steps = Math.round(seconds / STEP);
+  for (let i = 0; i < steps; i += 1) {
+    rig.car.update(STEP, { ...IDLE, brake: 1 });
+    rig.world.step();
+    rig.car.sync(STEP);
+    maxZ = Math.max(maxZ, rig.car.position.z);
+  }
+  return maxZ - startZ;
+}
+
+/**
  * W2 surface-feel tuning: the four materials must be distinguishable while
  * driving the test-track lanes, not only when braking or climbing. These
  * thresholds encode the intended character:
@@ -145,9 +163,7 @@ describe('surface feel', () => {
     const brake = createRig({ surface });
     simulate(brake, IDLE, 1);
     accelerateTo(brake, 30);
-    const brakeStart = brake.car.position.clone();
-    simulate(brake, { ...IDLE, brake: 1 }, 8);
-    const brakeDistance = brake.car.position.z - brakeStart.z;
+    const brakeStopDistance = brakeDistance(brake);
 
     const coast = createRig({ surface });
     simulate(coast, IDLE, 1);
@@ -163,7 +179,7 @@ describe('surface feel', () => {
     simulate(turn, { ...IDLE, throttle: 1, steer: 1 }, 1);
     const turnLateral = Math.abs(turn.car.position.x - turnStart.x);
 
-    return { launchTime, brakeDistance, coastDrop, turnLateral };
+    return { launchTime, brakeDistance: brakeStopDistance, coastDrop, turnLateral };
   };
 
   it('separates the four materials on launch, braking, coasting and steering', () => {
@@ -222,6 +238,66 @@ describe('RaycastVehicle', () => {
     expect(rig.car.drivetrain.shifting).toBe(false);
   });
 
+  it('engages R from a standstill and backs up on S', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    expect(rig.car.gearLabel).toBe('L');
+    expect(rig.car.isReverse).toBe(false);
+
+    simulate(rig, { ...IDLE, brake: 1 }, 2.5);
+
+    expect(rig.car.isReverse).toBe(true);
+    expect(rig.car.gearLabel).toBe('R');
+    expect(rig.car.speedKmh).toBeGreaterThan(3);
+    // The chassis still faces +Z; reverse means moving toward -Z.
+    expect(rig.car.forward.z).toBeGreaterThan(0.9);
+    expect(rig.car.position.z).toBeLessThan(-0.5);
+  });
+
+  it('brakes forward motion with S before engaging reverse', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    accelerateTo(rig, 25);
+    const beforeZ = rig.car.position.z;
+
+    simulate(rig, { ...IDLE, brake: 1 }, 0.5);
+    expect(rig.car.speedKmh).toBeLessThan(25);
+    expect(rig.car.position.z).toBeGreaterThan(beforeZ);
+    expect(rig.car.isReverse).toBe(false);
+
+    simulate(rig, { ...IDLE, brake: 1 }, 2);
+    expect(rig.car.isReverse).toBe(true);
+    expect(rig.car.position.z).toBeLessThan(beforeZ);
+  });
+
+  it('caps reverse speed while keeping the L/H range selection', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    rig.car.update(STEP, { ...IDLE, shiftUp: true });
+    simulate(rig, IDLE, 0.4);
+
+    simulate(rig, { ...IDLE, brake: 1 }, 8);
+
+    expect(rig.car.gearLabel).toBe('R');
+    expect(rig.car.gear).toBe('H');
+    expect(rig.car.speedKmh).toBeLessThanOrEqual(12.5);
+  });
+
+  it('W brakes a reversing car and re-engages the forward range', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    simulate(rig, { ...IDLE, brake: 1 }, 2);
+    expect(rig.car.isReverse).toBe(true);
+    const reverseZ = rig.car.position.z;
+
+    simulate(rig, { ...IDLE, throttle: 1 }, 2.5);
+
+    expect(rig.car.isReverse).toBe(false);
+    expect(rig.car.gearLabel).not.toBe('R');
+    expect(rig.car.position.z).toBeGreaterThan(reverseZ);
+    expect(rig.car.speedKmh).toBeGreaterThan(2);
+  });
+
   it('steers toward screen-right for positive steer input', () => {
     const rig = createRig();
     simulate(rig, IDLE, 1);
@@ -234,14 +310,18 @@ describe('RaycastVehicle', () => {
     expect(rig.car.forward.x).toBeLessThan(-0.05);
   });
 
-  it('reset returns the car to the spawn point and clears speed', () => {
+  it('reset returns the car to the spawn point and clears speed & reverse', () => {
     const rig = createRig();
-    simulate(rig, { ...IDLE, throttle: 1 }, 1);
+    simulate(rig, IDLE, 1);
+    simulate(rig, { ...IDLE, brake: 1 }, 2);
+    expect(rig.car.isReverse).toBe(true);
     rig.car.reset();
 
     expect(Math.abs(rig.car.position.x)).toBeLessThan(1e-4);
     expect(Math.abs(rig.car.position.z)).toBeLessThan(1e-4);
     expect(rig.car.speedKmh).toBe(0);
+    expect(rig.car.isReverse).toBe(false);
+    expect(rig.car.gearLabel).toBe('L');
   });
 
   // W2 #12 / issue #12: the same ramp must be climbable on dry dirt and not on

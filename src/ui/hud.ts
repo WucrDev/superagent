@@ -1,6 +1,6 @@
 import type { InputDevice } from '../core/input';
 import { CAMERA_MODE_LABELS, type CameraMode } from '../vehicle/cameraRig';
-import type { Gear } from '../vehicle/drivetrain';
+import type { GearLabel } from '../vehicle/drivetrain';
 
 const DEVICE_LABELS: Record<InputDevice, string> = {
   keyboard: '键盘',
@@ -24,7 +24,7 @@ export class Hud {
 
   update(
     speedKmh: number,
-    gear: Gear,
+    gear: GearLabel,
     camera: CameraMode,
     device: InputDevice,
   ): void {

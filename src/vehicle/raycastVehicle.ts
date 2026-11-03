@@ -29,6 +29,8 @@ const MAX_STEER = 0.5;
 
 const ENGINE_FORCE = 8000;
 const BRAKE_FORCE = 18000;
+/** Below this signed speed (m/s) S can engage reverse and W can re-engage drive. */
+const REVERSE_SWITCH_SPEED = 0.8;
 const LATERAL_GRIP = 7.5;
 const YAW_DAMPING = 900;
 const PITCH_ROLL_DAMPING = 500;
@@ -143,6 +145,15 @@ export class RaycastVehicle {
     return this.drivetrain.gear;
   }
 
+  /** HUD label: R while reversing, otherwise the selected L/H range. */
+  get gearLabel(): 'L' | 'H' | 'R' {
+    return this.drivetrain.gearLabel;
+  }
+
+  get isReverse(): boolean {
+    return this.drivetrain.isReverse;
+  }
+
   get speedKmh(): number {
     return Math.abs(this.forwardSpeed) * 3.6;
   }
@@ -240,16 +251,25 @@ export class RaycastVehicle {
       );
     }
 
-    const gearMax = this.drivetrain.maxSpeed;
+    this.updateDirection(input, speed);
+
+    const reverse = this.drivetrain.isReverse;
+    // S is the brake in drive and the reverse throttle in R; W is the throttle
+    // in drive and the brake in R. This keeps one pedal per intent and means
+    // the same S key brakes to a stop before backing up.
+    const driveInput = reverse ? input.brake : input.throttle;
+    const brakeInput = reverse ? input.throttle : input.brake;
+    const directionMax = this.drivetrain.maxSpeed;
+    const speedTowardDrive = reverse ? -speed : speed;
     const torqueFactor = this.drivetrain.shifting ? 0 : this.drivetrain.torqueFactor;
     const engineForce =
-      input.throttle *
+      driveInput *
       ENGINE_FORCE *
       torqueFactor *
       (1 - 0.4 * this.waterIngressLevel) *
-      clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
-    const perWheelDrive = engineForce / DRIVEN_WHEELS;
-    const perWheelBrake = (input.brake * BRAKE_FORCE) / WHEELS.length;
+      clamp((directionMax - Math.max(0, speedTowardDrive)) / 0.6, 0, 1);
+    const perWheelDrive = (reverse ? -engineForce : engineForce) / DRIVEN_WHEELS;
+    const perWheelBrake = (brakeInput * BRAKE_FORCE) / WHEELS.length;
     const handbrakeForce = input.handbrake ? (BRAKE_FORCE * 1.15) / WHEELS.length : 0;
 
     for (let index = 0; index < WHEELS.length; index += 1) {
@@ -278,6 +298,25 @@ export class RaycastVehicle {
       },
       true,
     );
+  }
+
+  /**
+   * Automatic direction change for the S brake/reverse pedal. Reverse only
+   * engages once the car is (nearly) stopped, so S always means "brake" while
+   * moving forward; W likewise brakes a reversing car before going forward.
+   */
+  private updateDirection(input: DrivingInput, speed: number): void {
+    const wantsReverse = input.brake > 0.05;
+    const wantsForward = input.throttle > 0.05;
+    if (this.drivetrain.isReverse) {
+      if (wantsForward && !wantsReverse && Math.abs(speed) <= REVERSE_SWITCH_SPEED) {
+        if (this.drivetrain.engageForward()) this.onShift?.();
+      }
+      return;
+    }
+    if (wantsReverse && !wantsForward && Math.abs(speed) <= REVERSE_SWITCH_SPEED) {
+      if (this.drivetrain.engageReverse()) this.onShift?.();
+    }
   }
 
   sync(dt: number): void {

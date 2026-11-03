@@ -101,7 +101,7 @@ async function boot(): Promise<void> {
 
         cameraRig.update(frameTime, input);
         effects.update(frameTime, car);
-        hud.update(car.speedKmh, car.gear, cameraRig.mode, input.device);
+        hud.update(car.speedKmh, car.gearLabel, cameraRig.mode, input.device);
         audio.update(car.speedKmh, lastThrottle, car.gear);
         renderer.render(scene, camera);
       },
