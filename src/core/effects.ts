@@ -20,6 +20,7 @@ export class SurfaceEffects {
   private readonly smoke: ParticleField;
   private readonly marks = new TireMarks(180);
   private markTimer = 0;
+  private winchMarkTimer = 0;
 
   constructor(scene: THREE.Scene) {
     const texture = createParticleTexture();
@@ -112,6 +113,44 @@ export class SurfaceEffects {
     this.spray.dispose();
     this.smoke.dispose();
     this.marks.dispose();
+  }
+
+  /**
+   * W3 #19: tire slip and ground marks while the winch drags a car whose wheels
+   * cannot hold. Called from the winch's render-rate sync; separate from the
+   * regular slip loop so a winched car still shows where the force is lost.
+   */
+  winchSlip(car: RaycastVehicle, intensity: number, dt: number): void {
+    this.winchMarkTimer -= dt;
+    const markThisFrame = this.winchMarkTimer <= 0;
+    if (markThisFrame) this.winchMarkTimer = 0.14;
+    const backwards = car.forward.clone().multiplyScalar(-1);
+
+    for (const contact of car.contacts) {
+      if (!contact.grounded) continue;
+      const surface = contact.surface;
+      if (surface.looseness <= 0) continue;
+      if (Math.random() < 0.45 + intensity * 0.35) {
+        this.debris.spawn(
+          contact.point,
+          backwards
+            .clone()
+            .multiplyScalar(1.2 + Math.random() * 1.8)
+            .add(
+              new THREE.Vector3(
+                (Math.random() - 0.5) * 1.4,
+                0.9 + Math.random() * 1.4,
+                (Math.random() - 0.5) * 1.4,
+              ),
+            ),
+          0.45 + Math.random() * 0.45,
+          surface.dustColor,
+        );
+      }
+      if (markThisFrame) {
+        this.marks.spawn(contact.point, contact.normal, contact.forward, surface);
+      }
+    }
   }
 }
 

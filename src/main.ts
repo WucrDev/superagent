@@ -3,12 +3,16 @@ import * as THREE from 'three';
 import './style.css';
 import { EngineAudio } from './core/audio';
 import { SurfaceEffects } from './core/effects';
+import { Haptics } from './core/haptics';
 import { InputManager } from './core/input';
 import { GameLoop } from './core/loop';
 import { createRenderer } from './core/renderer';
 import { createTestTrack } from './terrain/testTrack';
+import { createWinchCourse } from './terrain/winchCourse';
+import { Winch } from './tools/winch';
 import { Hud } from './ui/hud';
 import { SettingsPanel } from './ui/settingsPanel';
+import { WinchHud } from './ui/winchHud';
 import { CameraRig } from './vehicle/cameraRig';
 import { RaycastVehicle } from './vehicle/raycastVehicle';
 
@@ -21,6 +25,8 @@ declare global {
       world: RAPIER.World;
       input: InputManager;
       cameraRig: CameraRig;
+      winch: Winch;
+      anchors: ReturnType<typeof createWinchCourse>;
     };
   }
 }
@@ -67,6 +73,7 @@ async function boot(): Promise<void> {
     world.timestep = FIXED_STEP;
 
     const track = createTestTrack(scene, world);
+    const anchors = createWinchCourse(scene, world, track);
 
     const audio = new EngineAudio();
     const startAudio = (): void => audio.start();
@@ -79,16 +86,30 @@ async function boot(): Promise<void> {
     const cameraRig = new CameraRig(camera, car);
     new SettingsPanel(input, cameraRig);
     const hud = new Hud();
+    const winchHud = new WinchHud();
+    const haptics = new Haptics();
+    const winch = new Winch(scene, world, car, anchors, {
+      audio,
+      effects,
+      haptics,
+      hud: winchHud,
+    });
 
     let lastThrottle = 0;
 
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
         const sample = input.sample();
+        const tools = input.sampleTools();
         lastThrottle = sample.throttle;
-        if (sample.reset) car.reset();
+        if (tools.hud) winchHud.toggle();
+        if (sample.reset) {
+          car.reset();
+          winch.reset();
+        }
         if (sample.camera) cameraRig.cycle();
         car.update(step, sample);
+        winch.update(step, tools);
         world.step();
         car.sync(step);
       },
@@ -101,6 +122,7 @@ async function boot(): Promise<void> {
 
         cameraRig.update(frameTime, input);
         effects.update(frameTime, car);
+        winch.sync(frameTime);
         hud.update(car.speedKmh, car.gear, cameraRig.mode, input.device);
         audio.update(car.speedKmh, lastThrottle, car.gear);
         renderer.render(scene, camera);
@@ -113,7 +135,7 @@ async function boot(): Promise<void> {
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    window.__superagent = { car, world, input, cameraRig };
+    window.__superagent = { car, world, input, cameraRig, winch, anchors };
     loop.start();
     loading.classList.add('hidden');
   } catch (cause) {

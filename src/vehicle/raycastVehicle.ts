@@ -87,10 +87,13 @@ export interface WheelContact {
 export class RaycastVehicle {
   readonly group = new THREE.Group();
   readonly exterior = new THREE.Group();
+  /** Body/cabin/bumpers only: the winch can pitch this without moving the wheels. */
+  readonly bodyShell = new THREE.Group();
   readonly cockpit = new THREE.Group();
   readonly drivetrain = new Drivetrain();
 
   private readonly body: RAPIER.RigidBody;
+  private readonly chassisCollider: RAPIER.Collider;
   private readonly wheelStates: WheelState[] = [];
   private readonly steeringWheel: THREE.Group;
   private forwardSpeed = 0;
@@ -100,6 +103,8 @@ export class RaycastVehicle {
   private slopeAngle = 0;
   private maxSlip = 0;
   private dominantSurface: Surface = SURFACES.dirt;
+  private winchAssist = 1;
+  private winchLoad = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -123,7 +128,7 @@ export class RaycastVehicle {
     );
 
     // Low centre of mass keeps the blocky chassis from tripping over itself.
-    this.world.createCollider(
+    this.chassisCollider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(CHASSIS_HALF_WIDTH, CHASSIS_HALF_HEIGHT, CHASSIS_HALF_LENGTH)
         .setMassProperties(
           CHASSIS_MASS,
@@ -204,6 +209,77 @@ export class RaycastVehicle {
     this.exterior.visible = !active;
   }
 
+  /** W3 #17: world-space front hook point the rope pulls on. */
+  get hookPoint(): THREE.Vector3 {
+    const t = this.body.translation();
+    const q = this.body.rotation();
+    return new THREE.Vector3(0, 0.05, 2.15)
+      .applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w))
+      .add(new THREE.Vector3(t.x, t.y, t.z));
+  }
+
+  get velocity(): THREE.Vector3 {
+    const v = this.body.linvel();
+    return new THREE.Vector3(v.x, v.y, v.z);
+  }
+
+  get mass(): number {
+    return CHASSIS_MASS;
+  }
+
+  get rigidBody(): RAPIER.RigidBody {
+    return this.body;
+  }
+
+  get chassisColliderHandle(): number {
+    return this.chassisCollider.handle;
+  }
+
+  /** W3 #20: true once the chassis is on its side or roof. */
+  get isRolledOver(): boolean {
+    return this.up.y < 0.35;
+  }
+
+  /** W3 #17: apply a winch impulse at the front hook. */
+  applyWinchImpulse(impulse: THREE.Vector3, point: THREE.Vector3): void {
+    this.body.applyImpulseAtPoint(
+      { x: impulse.x, y: impulse.y, z: impulse.z },
+      { x: point.x, y: point.y, z: point.z },
+      true,
+    );
+  }
+
+  /** W3 #19: throttle still helps, but only ~35 % while the rope is loaded. */
+  setWinchAssist(active: boolean): void {
+    this.winchAssist = active ? 0.35 : 1;
+  }
+
+  /** 0..1 rope load, used for the subtle nose-down visual. */
+  setWinchLoad(load: number): void {
+    this.winchLoad = clamp(load, 0, 1.5);
+  }
+
+  /** W3 #20: temporary righting action until the W4 jack exists. */
+  rightAtCurrent(): void {
+    const t = this.body.translation();
+    const q = this.body.rotation();
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(
+      new THREE.Quaternion(q.x, q.y, q.z, q.w),
+    );
+    const yaw = Math.atan2(forward.x, forward.z);
+    const upright = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    this.body.setTranslation({ x: t.x, y: Math.max(t.y + 1, 1.4), z: t.z }, true);
+    this.body.setRotation(
+      { x: upright.x, y: upright.y, z: upright.z, w: upright.w },
+      true,
+    );
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.winchAssist = 1;
+    this.winchLoad = 0;
+    this.sync(0);
+  }
+
   update(dt: number, input: DrivingInput): void {
     this.drivetrain.update(dt);
     this.lastSteer = input.steer;
@@ -247,6 +323,7 @@ export class RaycastVehicle {
       ENGINE_FORCE *
       torqueFactor *
       (1 - 0.4 * this.waterIngressLevel) *
+      this.winchAssist *
       clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
     const perWheelDrive = engineForce / DRIVEN_WHEELS;
     const perWheelBrake = (input.brake * BRAKE_FORCE) / WHEELS.length;
@@ -301,6 +378,11 @@ export class RaycastVehicle {
     }
 
     this.steeringWheel.rotation.z = -this.lastSteer * 1.8;
+
+    // W3 #19: a loaded rope pulls the body down a few centimetres; the wheels
+    // stay on their suspension rays so the ride height does not lie.
+    this.bodyShell.position.y = -0.05 * this.winchLoad;
+    this.bodyShell.rotation.x = 0.03 * this.winchLoad;
   }
 
   reset(): void {
@@ -315,6 +397,8 @@ export class RaycastVehicle {
     this.slopeAngle = 0;
     this.maxSlip = 0;
     this.dominantSurface = SURFACES.dirt;
+    this.winchAssist = 1;
+    this.winchLoad = 0;
     for (const state of this.wheelStates) {
       state.compression = 0;
       state.length = SUSPENSION_REST;
@@ -549,13 +633,14 @@ export class RaycastVehicle {
   }
 
   private buildExterior(): void {
+    this.exterior.add(this.bodyShell);
     const bodyMesh = new THREE.Mesh(
       new THREE.BoxGeometry(1.8, 0.6, 4.0),
       new THREE.MeshStandardMaterial({ color: 0xd95f2b, roughness: 0.5, metalness: 0.15 }),
     );
     bodyMesh.castShadow = true;
     bodyMesh.receiveShadow = true;
-    this.exterior.add(bodyMesh);
+    this.bodyShell.add(bodyMesh);
 
     const cabin = new THREE.Mesh(
       new THREE.BoxGeometry(1.5, 0.5, 1.8),
@@ -563,14 +648,14 @@ export class RaycastVehicle {
     );
     cabin.position.set(0, 0.55, -0.15);
     cabin.castShadow = true;
-    this.exterior.add(cabin);
+    this.bodyShell.add(cabin);
 
     const bumperMaterial = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.8 });
     for (const z of [-2.02, 2.02]) {
       const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.2, 0.24), bumperMaterial);
       bumper.position.set(0, -0.18, z);
       bumper.castShadow = true;
-      this.exterior.add(bumper);
+      this.bodyShell.add(bumper);
     }
 
     const tireMaterial = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.95 });
