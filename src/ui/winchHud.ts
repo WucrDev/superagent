@@ -98,14 +98,13 @@ export class WinchHud {
   private updatePrompt(snapshot: WinchSnapshot): void {
     let text = '';
     let tone = '';
-    if (snapshot.state === 'rolled') {
-      text =
-        snapshot.rightingProgress > 0
-          ? `翻正中 ${(WINCH.rightingTime * (1 - snapshot.rightingProgress)).toFixed(
-              1,
-            )} s · 按住 J`
-          : '侧翻 · 按住 J 翻正（10 s）';
-      tone = 'warn';
+    if (snapshot.suppressed) {
+      // W4: the jack/plank/repair prompt owns the line while another tool is
+      // active; the winch only speaks when it is itself the selected tool.
+      text = '';
+    } else if (snapshot.state === 'rolled') {
+      // The W4 jack prompt (tool HUD) explains how to right the car.
+      text = '';
     } else if (snapshot.state === 'broken' || snapshot.state === 'anchorFailed') {
       text = snapshot.message || (snapshot.state === 'broken' ? '绳断了' : '锚点脱落');
       tone = 'danger';

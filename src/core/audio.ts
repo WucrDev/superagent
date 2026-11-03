@@ -16,6 +16,8 @@ export class EngineAudio {
   private winchFilter?: BiquadFilterNode;
   private creak?: OscillatorNode;
   private creakGain?: GainNode;
+  private jack?: OscillatorNode;
+  private jackGain?: GainNode;
   private noise?: AudioBuffer;
   private started = false;
   private muted = false;
@@ -68,6 +70,20 @@ export class EngineAudio {
       creakGain.connect(context.destination);
       creak.start();
 
+      // W4 #22: hydraulic jack pump, silent until the jack is actually used.
+      const jack = context.createOscillator();
+      jack.type = 'square';
+      jack.frequency.value = 68;
+      const jackFilter = context.createBiquadFilter();
+      jackFilter.type = 'lowpass';
+      jackFilter.frequency.value = 220;
+      const jackGain = context.createGain();
+      jackGain.gain.value = 0;
+      jack.connect(jackFilter);
+      jackFilter.connect(jackGain);
+      jackGain.connect(context.destination);
+      jack.start();
+
       const noise = context.createBuffer(1, context.sampleRate * 0.5, context.sampleRate);
       const samples = noise.getChannelData(0);
       for (let index = 0; index < samples.length; index += 1) {
@@ -83,6 +99,8 @@ export class EngineAudio {
       this.winchFilter = winchFilter;
       this.creak = creak;
       this.creakGain = creakGain;
+      this.jack = jack;
+      this.jackGain = jackGain;
       this.noise = noise;
     } catch {
       // Silent fallback: the prototype must still run without audio.
@@ -207,6 +225,171 @@ export class EngineAudio {
     oscillator.stop(now + 0.35);
   }
 
+  /** W4 #22: hydraulic valve clunk when the jack takes the weight. */
+  jackStart(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    this.playNoise(0.09, 0.05, 520);
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(95, now);
+    oscillator.frequency.exponentialRampToValueAtTime(58, now + 0.12);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.03, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.15);
+  }
+
+  /** Continuous hydraulic pump tone while the jack lifts the car. */
+  jackPump(active: boolean, progress: number): void {
+    if (!this.context || !this.jack || !this.jackGain) return;
+    const now = this.context.currentTime;
+    if (this.muted || !active) {
+      this.jackGain.gain.setTargetAtTime(0, now, 0.06);
+      return;
+    }
+    this.jack.frequency.setTargetAtTime(64 + progress * 26, now, 0.08);
+    this.jackGain.gain.setTargetAtTime(0.018 + progress * 0.012, now, 0.08);
+  }
+
+  /** W4 #22: the car settles back onto its wheels. */
+  jackDone(): void {
+    if (!this.context || this.muted) return;
+    this.jackPump(false, 0);
+    const now = this.context.currentTime;
+    this.playNoise(0.16, 0.06, 420);
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(120, now);
+    oscillator.frequency.exponentialRampToValueAtTime(52, now + 0.18);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.06, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.21);
+  }
+
+  /** W4 #23: ratchet click during the 2 s repair animation. */
+  repairTick(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(340, now);
+    oscillator.frequency.exponentialRampToValueAtTime(210, now + 0.04);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.018, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.07);
+  }
+
+  /** W4 #23: wrench-down confirmation when a kit is spent. */
+  repairDone(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(300, now);
+    oscillator.frequency.setValueAtTime(450, now + 0.07);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.03, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.23);
+  }
+
+  /** W4 #24: supply crate collected. */
+  pickup(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    for (const [offset, frequency] of [
+      [0, 520],
+      [0.08, 780],
+    ] as const) {
+      const oscillator = this.context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      const gain = this.context.createGain();
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.linearRampToValueAtTime(0.03, now + offset + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.11);
+      oscillator.connect(gain);
+      gain.connect(this.context.destination);
+      oscillator.start(now + offset);
+      oscillator.stop(now + offset + 0.12);
+    }
+  }
+
+  /** W4 #23: crash thud; the HUD carries the number. */
+  damage(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    this.playNoise(0.22, 0.09, 340);
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(78, now);
+    oscillator.frequency.exponentialRampToValueAtTime(34, now + 0.26);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.29);
+  }
+
+  /** W4 #21: the board lands on both supports. */
+  plankPlace(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    this.playNoise(0.16, 0.07, 480);
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(150, now);
+    oscillator.frequency.exponentialRampToValueAtTime(70, now + 0.14);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.17);
+  }
+
+  /** W4 #21: a badly placed board scrapes and falls. */
+  plankSlip(): void {
+    if (!this.context || this.muted) return;
+    this.playNoise(0.5, 0.05, 1500);
+  }
+
+  /** W4 #21: the board flexes under the car. */
+  plankCreak(load: number): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    const clamped = Math.max(0, Math.min(1, load));
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(240 + clamped * 180, now);
+    oscillator.frequency.exponentialRampToValueAtTime(180 + clamped * 90, now + 0.12);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.006 + clamped * 0.012, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.17);
+  }
+
   private playNoise(duration: number, level: number, cutoff: number): void {
     if (!this.context || !this.noise) return;
     const now = this.context.currentTime;
@@ -234,6 +417,7 @@ export class EngineAudio {
     this.engine?.stop();
     this.winch?.stop();
     this.creak?.stop();
+    this.jack?.stop();
     void this.context?.close();
   }
 }

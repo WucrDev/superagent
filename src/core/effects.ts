@@ -82,6 +82,31 @@ export class SurfaceEffects {
       }
     }
 
+    // W4 #23: a damaged engine (below 35 health) smokes dark grey, so the
+    // condition is visible even when the HUD bar is not being read.
+    if (car.healthValue < 35 && car.healthValue > 0 && Math.random() < 0.4) {
+      const engine = car.position
+        .clone()
+        .addScaledVector(car.up, 0.7)
+        .addScaledVector(car.forward, 1.3);
+      const severity = 1 - car.healthValue / 35;
+      this.smoke.spawn(
+        engine,
+        car.up
+          .clone()
+          .multiplyScalar(0.7 + Math.random() * 0.6)
+          .add(
+            new THREE.Vector3(
+              (Math.random() - 0.5) * 0.5,
+              0.2 + Math.random() * 0.4,
+              (Math.random() - 0.5) * 0.5,
+            ),
+          ),
+        1.1 + severity * 1.2,
+        0x3d3d3a,
+      );
+    }
+
     if (car.waterIngress > 0.12 && Math.random() < 0.55) {
       const engine = car.position
         .clone()

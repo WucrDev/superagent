@@ -29,6 +29,13 @@ function tools(overrides: Partial<ToolInput> = {}): ToolInput {
     auto: false,
     right: false,
     hud: false,
+    slot: null,
+    wheelHeld: false,
+    wheelX: 0,
+    wheelY: 0,
+    nextTool: false,
+    drop: false,
+    useHeld: false,
     ...overrides,
   };
 }

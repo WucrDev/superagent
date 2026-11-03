@@ -8,7 +8,7 @@ import { clamp } from '../core/math';
  * rolling resistance; `gripCurve` adds the drop-off that makes a sliding tire
  * lose grip progressively instead of behaving like a constant friction pad.
  */
-export type SurfaceId = 'dirt' | 'mud' | 'wetMud' | 'rock' | 'snow' | 'water';
+export type SurfaceId = 'dirt' | 'mud' | 'wetMud' | 'rock' | 'snow' | 'water' | 'wood';
 
 export interface Surface {
   id: SurfaceId;
@@ -73,6 +73,17 @@ export const SURFACES: Record<SurfaceId, Surface> = {
     looseness: 0.8,
     dustColor: 0xf2f6fa,
   },
+  // W4 #21: the 4 m plank bridge. Dry wood has less grip than rock and a bit
+  // more rolling resistance than dirt, so the car crosses it deliberately.
+  wood: {
+    id: 'wood',
+    label: '木板',
+    friction: 0.78,
+    lateralGrip: 0.9,
+    rollingResistance: 1.1,
+    looseness: 0.05,
+    dustColor: 0x8a6a3a,
+  },
   // Deep water is not a driving surface; it is the submerged terrain under the
   // water plane. It is only used if a wheel somehow touches the bed.
   water: {
@@ -121,6 +132,11 @@ export class TerrainField {
 
   surfaceAt(colliderHandle: number): Surface {
     return this.surfaceByCollider.get(colliderHandle) ?? SURFACES.dirt;
+  }
+
+  /** Remove a dynamic surface registration (e.g. a consumed plank bridge). */
+  removeSurface(colliderHandle: number): void {
+    this.surfaceByCollider.delete(colliderHandle);
   }
 
   addWater(zone: WaterZone): void {

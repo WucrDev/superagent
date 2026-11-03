@@ -66,6 +66,8 @@ export interface WinchSnapshot {
   slipping: boolean;
   rightingProgress: number;
   reeling: boolean;
+  /** Hide the prompt (another tool owns the controls, or the jack is lifting). */
+  suppressed: boolean;
 }
 
 export interface WinchDeps {
@@ -128,6 +130,7 @@ export class Winch {
   private message = '';
   private messageTimer = 0;
   private reeling = false;
+  private suppressed = false;
   private time = 0;
 
   constructor(
@@ -199,6 +202,15 @@ export class Winch {
     return this.falling;
   }
 
+  /**
+   * W4: another tool (plank/jack/repair) can own the context prompt. The winch
+   * keeps simulating a rope that is already attached, but stops advertising
+   * itself so two prompts never tell the player to press G for different things.
+   */
+  setSuppressed(suppressed: boolean): void {
+    this.suppressed = suppressed;
+  }
+
   /** Fixed-step simulation + input state machine. */
   update(dt: number, input: ToolInput): void {
     this.time += dt;
@@ -209,8 +221,6 @@ export class Winch {
     if (this.failFlash <= 0 && (this.state === 'broken' || this.state === 'anchorFailed')) {
       this.state = 'ready';
     }
-
-    this.updateRighting(dt, input);
 
     if (this.car.isRolledOver) {
       if (this.attached) this.release('侧翻，绳已松开', 'rolled');
@@ -285,6 +295,7 @@ export class Winch {
       slipping: this.slipTimer > 0.2,
       rightingProgress: clamp(this.rightProgress / WINCH.rightingTime, 0, 1),
       reeling: this.reeling,
+      suppressed: this.suppressed,
     };
   }
 
@@ -346,25 +357,6 @@ export class Winch {
     for (const marker of this.markers.values()) {
       (marker.material as THREE.Material).dispose();
       this.scene.remove(marker);
-    }
-  }
-
-  private updateRighting(dt: number, input: ToolInput): void {
-    if (!this.car.isRolledOver) {
-      this.rightProgress = 0;
-      return;
-    }
-    if (!input.right) {
-      this.rightProgress = Math.max(0, this.rightProgress - dt * 3);
-      return;
-    }
-    this.rightProgress += dt;
-    if (this.rightProgress >= WINCH.rightingTime) {
-      this.car.rightAtCurrent();
-      this.rightProgress = 0;
-      this.message = '已翻正，可以继续';
-      this.messageTimer = 2.5;
-      this.deps.haptics?.pulse(0.8);
     }
   }
 
@@ -966,11 +958,7 @@ export class Winch {
 
   private statusText(): string {
     if (this.state === 'rolled') {
-      if (this.rightProgress > 0) {
-        const remaining = WINCH.rightingTime - this.rightProgress;
-        return `翻正中 ${remaining.toFixed(1)}s`;
-      }
-      return '侧翻 · 按住 J 翻正';
+      return '侧翻 · 用千斤顶翻正';
     }
     if (this.state === 'broken' || this.failState === 'broken') {
       if (this.failFlash > 0) return '绳断了';

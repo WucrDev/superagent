@@ -15,7 +15,7 @@ export interface DrivingInput {
   camera: boolean;
 }
 
-/** W3 winch / righting controls, sampled alongside the driving input. */
+/** W3 winch + W4 tool controls, sampled alongside the driving input. */
 export interface ToolInput {
   /** Hold to reel in while a rope is attached; ignored when idle. */
   winchHeld: boolean;
@@ -25,10 +25,23 @@ export interface ToolInput {
   cycle: boolean;
   /** Edge: return to automatic anchor selection. */
   auto: boolean;
-  /** Held: right the car after a rollover. */
+  /** Held: right the car with the W4 hydraulic jack after a rollover. */
   right: boolean;
   /** Edge: toggle the tension bar + angle ring. */
   hud: boolean;
+  /** Edge: number-key slot selection (0-based: 1..4). */
+  slot: number | null;
+  /** Held: open the radial tool wheel (T / gamepad View). */
+  wheelHeld: boolean;
+  /** Wheel direction from the left stick or D-pad (right positive). */
+  wheelX: number;
+  wheelY: number;
+  /** Edge: cycle to the next tool (short tap of the wheel key). */
+  nextTool: boolean;
+  /** Edge: drop one unit of the active consumable. */
+  drop: boolean;
+  /** Held: context use (G / gamepad B) for repairs. */
+  useHeld: boolean;
 }
 
 export type InputDevice = 'keyboard' | 'gamepad' | 'none';
@@ -58,6 +71,12 @@ const DRIVING_KEYS = new Set([
   'KeyV',
   'KeyJ',
   'KeyH',
+  'KeyT',
+  'Digit1',
+  'Digit2',
+  'Digit3',
+  'Digit4',
+  'Backspace',
   'ArrowUp',
   'ArrowLeft',
   'ArrowDown',
@@ -66,7 +85,20 @@ const DRIVING_KEYS = new Set([
 ]);
 
 /** Edge-triggered tool keys are latched until the next fixed-step sample. */
-const TOOL_EDGE_KEYS = new Set(['KeyG', 'KeyX', 'KeyV', 'KeyH']);
+const TOOL_EDGE_KEYS = new Set([
+  'KeyG',
+  'KeyX',
+  'KeyV',
+  'KeyH',
+  'Digit1',
+  'Digit2',
+  'Digit3',
+  'Digit4',
+  'Backspace',
+]);
+
+const WHEEL_TAP_TIME = 0.32;
+const WHEEL_DEADZONE = 0.35;
 
 /**
  * Web equivalent of an input map: keyboard + mouse (right-drag look / wheel
@@ -87,6 +119,8 @@ export class InputManager {
   private toolCycleHeld = false;
   private toolAutoHeld = false;
   private toolHudHeld = false;
+  private wheelHeld = false;
+  private wheelHoldTime = 0;
   private looking = false;
   private lookDelta: LookDelta = { x: 0, y: 0 };
 
@@ -213,10 +247,12 @@ export class InputManager {
   }
 
   /**
-   * W3 winch controls. Keyboard: G hook/release, F hold reel (only with a rope
-   * attached), X cycle manual anchor, V auto anchor, J hold righting, H toggle
-   * tension HUD. Gamepad: B hook/release, X reel, D-pad left/right anchor, down
-   * righting, up HUD.
+   * W3 winch + W4 tool controls.
+   *
+   * Keyboard: G hook/use, F reel, X/V anchor, J jack, H tension HUD, 1-4 tools,
+   * hold T for the wheel (tap = next tool), Backspace drops the active item.
+   * Gamepad: B hook/use, X reel, D-pad left/right anchor, up HUD, hold View for
+   * the wheel (tap = next tool, D-pad/stick chooses the slot).
    */
   sampleTools(): ToolInput {
     const pad = this.getGamepad();
@@ -226,23 +262,81 @@ export class InputManager {
     const padAuto = pad ? (pad.buttons[14]?.value ?? 0) > 0.5 : false;
     const padRight = pad ? (pad.buttons[13]?.value ?? 0) > 0.5 : false;
     const padHud = pad ? (pad.buttons[12]?.value ?? 0) > 0.5 : false;
+    const padWheel = pad ? (pad.buttons[8]?.value ?? 0) > 0.5 : false;
 
     const winchHeld = padWinch || this.keys.has('KeyF');
     const hookHeld = padHook || this.keys.has('KeyG');
     const cycleHeld = padCycle || this.keys.has('KeyX');
     const autoHeld = padAuto || this.keys.has('KeyV');
     const hudHeld = padHud || this.keys.has('KeyH');
+    const useHeld = hookHeld;
+    const wheelHeld = padWheel || this.keys.has('KeyT');
+
+    // While the wheel is open the D-pad selects a slot instead of driving the
+    // winch HUD; the stick also works and does not steal the driving axes.
+    let wheelX = 0;
+    let wheelY = 0;
+    if (wheelHeld) {
+      const up = pad ? (pad.buttons[12]?.value ?? 0) > 0.5 : false;
+      const down = pad ? (pad.buttons[13]?.value ?? 0) > 0.5 : false;
+      const left = pad ? (pad.buttons[14]?.value ?? 0) > 0.5 : false;
+      const right = pad ? (pad.buttons[15]?.value ?? 0) > 0.5 : false;
+      wheelX = (right ? 1 : 0) - (left ? 1 : 0);
+      wheelY = (down ? 1 : 0) - (up ? 1 : 0);
+      if (wheelX === 0 && wheelY === 0 && pad) {
+        const ax = pad.axes[0] ?? 0;
+        const ay = pad.axes[1] ?? 0;
+        wheelX = Math.abs(ax) > WHEEL_DEADZONE ? ax : 0;
+        wheelY = Math.abs(ay) > WHEEL_DEADZONE ? ay : 0;
+      }
+    }
+
+    let slot: number | null = null;
+    for (let index = 0; index < 4; index += 1) {
+      if (this.pressed.has(`Digit${index + 1}`)) slot = index;
+    }
+
+    let nextTool = false;
+    if (this.wheelHeld && !wheelHeld) {
+      nextTool = this.wheelHoldTime < WHEEL_TAP_TIME;
+    }
 
     const input: ToolInput = {
       winchHeld,
-      hook: (hookHeld && !this.toolHookHeld) || this.pressed.has('KeyG'),
-      cycle: (cycleHeld && !this.toolCycleHeld) || this.pressed.has('KeyX'),
-      auto: (autoHeld && !this.toolAutoHeld) || this.pressed.has('KeyV'),
-      right: padRight || this.keys.has('KeyJ'),
-      hud: (hudHeld && !this.toolHudHeld) || this.pressed.has('KeyH'),
+      hook: wheelHeld
+        ? false
+        : (hookHeld && !this.toolHookHeld) || this.pressed.has('KeyG'),
+      cycle: wheelHeld ? false : (cycleHeld && !this.toolCycleHeld) || this.pressed.has('KeyX'),
+      auto: wheelHeld ? false : (autoHeld && !this.toolAutoHeld) || this.pressed.has('KeyV'),
+      right: wheelHeld ? false : padRight || this.keys.has('KeyJ'),
+      hud: wheelHeld ? false : (hudHeld && !this.toolHudHeld) || this.pressed.has('KeyH'),
+      slot,
+      wheelHeld,
+      wheelX,
+      wheelY,
+      nextTool,
+      drop: this.pressed.has('Backspace') || (wheelHeld && padHook && !this.toolHookHeld),
+      useHeld: wheelHeld ? false : useHeld,
     };
 
-    for (const code of ['KeyG', 'KeyX', 'KeyV', 'KeyH']) this.pressed.delete(code);
+    // The fixed-step clock is 60 Hz; callers drive this at that rate, so the
+    // held duration can be approximated from the number of active samples.
+    this.wheelHoldTime = wheelHeld ? this.wheelHoldTime + 1 / 60 : 0;
+    this.wheelHeld = wheelHeld;
+
+    for (const code of [
+      'KeyG',
+      'KeyX',
+      'KeyV',
+      'KeyH',
+      'Digit1',
+      'Digit2',
+      'Digit3',
+      'Digit4',
+      'Backspace',
+    ]) {
+      this.pressed.delete(code);
+    }
     this.toolHookHeld = hookHeld;
     this.toolCycleHeld = cycleHeld;
     this.toolAutoHeld = autoHeld;
@@ -307,6 +401,8 @@ export class InputManager {
     this.toolCycleHeld = false;
     this.toolAutoHeld = false;
     this.toolHudHeld = false;
+    this.wheelHeld = false;
+    this.wheelHoldTime = 0;
     this.looking = false;
   };
 

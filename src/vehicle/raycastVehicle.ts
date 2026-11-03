@@ -3,6 +3,13 @@ import * as THREE from 'three';
 import type { DrivingInput } from '../core/input';
 import { clamp } from '../core/math';
 import {
+  VEHICLE_HEALTH,
+  applyDamage,
+  applyRepair,
+  powerFactorFor,
+  steerFactorFor,
+} from '../tools/healthMath';
+import {
   SURFACES,
   TerrainField,
   gripCurve,
@@ -113,6 +120,11 @@ export class RaycastVehicle {
   private winchLoad = 0;
   private reverse = false;
   private reverseHold = 0;
+  private health: number = VEHICLE_HEALTH.max;
+  private damageFlash = 0;
+  private jackStartPosition = new THREE.Vector3();
+  private jackStartRotation = new THREE.Quaternion();
+  private jacking = false;
 
   constructor(
     scene: THREE.Scene,
@@ -136,6 +148,9 @@ export class RaycastVehicle {
     );
 
     // Low centre of mass keeps the blocky chassis from tripping over itself.
+    // W4 #23: contact-force events on the chassis are the damage source. The
+    // suspension is raycast-based, so a chassis contact really is a crash or a
+    // hard landing, not normal driving.
     this.chassisCollider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(CHASSIS_HALF_WIDTH, CHASSIS_HALF_HEIGHT, CHASSIS_HALF_LENGTH)
         .setMassProperties(
@@ -145,7 +160,9 @@ export class RaycastVehicle {
           { x: 0, y: 0, z: 0, w: 1 },
         )
         .setFriction(0.5)
-        .setRestitution(0.05),
+        .setRestitution(0.05)
+        .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+        .setContactForceEventThreshold(VEHICLE_HEALTH.impactForceThreshold),
       this.body,
     );
 
@@ -245,6 +262,42 @@ export class RaycastVehicle {
     return CHASSIS_MASS;
   }
 
+  /** W4 #23: 0..100 current vehicle condition. */
+  get healthValue(): number {
+    return this.health;
+  }
+
+  /** Multiplier on engine torque from crash damage (1 while healthy). */
+  get damagePowerFactor(): number {
+    return powerFactorFor(this.health);
+  }
+
+  /** Multiplier on steering angle from crash damage (1 while healthy). */
+  get damageSteerFactor(): number {
+    return steerFactorFor(this.health);
+  }
+
+  /** 1 right after a hit, decaying over ~0.8 s for the HUD flash. */
+  get damageFlashLevel(): number {
+    return this.damageFlash;
+  }
+
+  /** W4 #23: apply crash damage; returns the health actually lost. */
+  applyDamage(amount: number): number {
+    const before = this.health;
+    this.health = applyDamage(this.health, amount);
+    const lost = before - this.health;
+    if (lost > 0) this.damageFlash = 1;
+    return lost;
+  }
+
+  /** W4 #23: repair kit heals up to the 100 cap; returns the health restored. */
+  repairHealth(amount: number): number {
+    const before = this.health;
+    this.health = applyRepair(this.health, amount);
+    return this.health - before;
+  }
+
   get rigidBody(): RAPIER.RigidBody {
     return this.body;
   }
@@ -277,7 +330,60 @@ export class RaycastVehicle {
     this.winchLoad = clamp(load, 0, 1.5);
   }
 
-  /** W3 #20: temporary righting action until the W4 jack exists. */
+  /** W4 #22: start a hydraulic-jack lift; remember the pose to animate from. */
+  beginJack(): void {
+    const t = this.body.translation();
+    const q = this.body.rotation();
+    this.jackStartPosition.set(t.x, t.y, t.z);
+    this.jackStartRotation.set(q.x, q.y, q.z, q.w);
+    this.jacking = true;
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  /**
+   * W4 #22: animate the chassis from its rolled pose to upright over the jack
+   * progress (0..1). The body is moved directly and its velocity zeroed so the
+   * lift reads as a hydraulic jack rather than a physics bounce.
+   */
+  applyJackProgress(progress: number): void {
+    if (!this.jacking) return;
+    const t = clamp(progress, 0, 1);
+    const eased = t * t * (3 - 2 * t);
+    const forward = new THREE.Vector3(0, 0, 1)
+      .applyQuaternion(this.jackStartRotation);
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-4) forward.set(0, 0, 1);
+    forward.normalize();
+    const yaw = Math.atan2(forward.x, forward.z);
+    const upright = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      yaw,
+    );
+    const rotation = this.jackStartRotation.clone().slerp(upright, eased);
+    const lift = 0.45 * Math.sin(Math.PI * Math.min(1, t));
+    this.body.setTranslation(
+      {
+        x: this.jackStartPosition.x,
+        y: this.jackStartPosition.y + lift,
+        z: this.jackStartPosition.z,
+      },
+      true,
+    );
+    this.body.setRotation(
+      { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w },
+      true,
+    );
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  /** Finish or abort the jack animation; the car settles on its wheels. */
+  endJack(): void {
+    this.jacking = false;
+  }
+
+  /** W3 #20: righting action used at the end of the W4 jack animation. */
   rightAtCurrent(): void {
     const t = this.body.translation();
     const q = this.body.rotation();
@@ -286,7 +392,9 @@ export class RaycastVehicle {
     );
     const yaw = Math.atan2(forward.x, forward.z);
     const upright = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-    this.body.setTranslation({ x: t.x, y: Math.max(t.y + 1, 1.4), z: t.z }, true);
+    // The W4 jack animation already lifted the body; settle from its current
+    // height instead of teleporting a metre up (that read as a hop).
+    this.body.setTranslation({ x: t.x, y: Math.max(t.y, 1.0), z: t.z }, true);
     this.body.setRotation(
       { x: upright.x, y: upright.y, z: upright.z, w: upright.w },
       true,
@@ -317,6 +425,7 @@ export class RaycastVehicle {
     const velocity = this.body.linvel();
     const speed = velocity.x * chassisForward.x + velocity.y * chassisForward.y + velocity.z * chassisForward.z;
     this.updateReverse(dt, input, speed);
+    this.damageFlash = Math.max(0, this.damageFlash - dt * 1.4);
 
     // W2 #7 / issue #13: deep water (> 50 cm) floods the intake; power drops
     // 40 % and recovers over 10 s once the car is back on dry ground.
@@ -349,6 +458,7 @@ export class RaycastVehicle {
         -input.brake *
           REVERSE_FORCE *
           powerFactor *
+          this.damagePowerFactor *
           this.winchAssist *
           clamp((REVERSE_MAX_SPEED - reverseSpeed) / 0.6, 0, 1) +
         // A light governor keeps a downhill roll from running away past the
@@ -362,6 +472,7 @@ export class RaycastVehicle {
         ENGINE_FORCE *
         torqueFactor *
         powerFactor *
+        this.damagePowerFactor *
         this.winchAssist *
         clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
     }
@@ -434,6 +545,8 @@ export class RaycastVehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.drivetrain.reset();
     this.disengageReverse();
+    this.damageFlash = 0;
+    this.jacking = false;
     this.forwardSpeed = 0;
     this.lastSteer = 0;
     this.waterIngressLevel = 0;
@@ -554,7 +667,9 @@ export class RaycastVehicle {
       }
     }
 
-    state.steerAngle = config.steer ? -input.steer * MAX_STEER : 0;
+    state.steerAngle = config.steer
+      ? -input.steer * MAX_STEER * this.damageSteerFactor
+      : 0;
 
     if (!Number.isFinite(closestDistance)) {
       state.grounded = false;

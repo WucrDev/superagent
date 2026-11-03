@@ -9,9 +9,11 @@ import { GameLoop } from './core/loop';
 import { createRenderer } from './core/renderer';
 import { createTestTrack } from './terrain/testTrack';
 import { createWinchCourse } from './terrain/winchCourse';
+import { Toolkit } from './tools/toolkit';
 import { Winch } from './tools/winch';
 import { Hud } from './ui/hud';
 import { SettingsPanel } from './ui/settingsPanel';
+import { ToolHud } from './ui/toolHud';
 import { WinchHud } from './ui/winchHud';
 import { CameraRig } from './vehicle/cameraRig';
 import { RaycastVehicle } from './vehicle/raycastVehicle';
@@ -26,6 +28,7 @@ declare global {
       input: InputManager;
       cameraRig: CameraRig;
       winch: Winch;
+      toolkit: Toolkit;
       anchors: ReturnType<typeof createWinchCourse>;
     };
   }
@@ -77,6 +80,8 @@ async function boot(): Promise<void> {
 
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     world.timestep = FIXED_STEP;
+    // W4 #23: chassis contact forces are the damage source.
+    const eventQueue = new RAPIER.EventQueue(true);
 
     const track = createTestTrack(scene, world);
     const anchors = createWinchCourse(scene, world, track);
@@ -100,7 +105,26 @@ async function boot(): Promise<void> {
       haptics,
       hud: winchHud,
     });
+    let toolkit: Toolkit | null = null;
+    const toolHud = new ToolHud((index) => toolkit?.inventory.select(index));
+    toolkit = new Toolkit(scene, world, car, track, {
+      audio,
+      effects,
+      haptics,
+      hud: toolHud,
+    });
+    const tools = toolkit;
 
+    const IDLE_DRIVE = {
+      throttle: 0,
+      brake: 0,
+      steer: 0,
+      handbrake: false,
+      reset: false,
+      shiftUp: false,
+      shiftDown: false,
+      camera: false,
+    } as const;
     let lastThrottle = 0;
 
     const tutorial = document.querySelector<HTMLElement>('#tutorial');
@@ -172,20 +196,50 @@ async function boot(): Promise<void> {
 
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
-        const sample = input.sample();
-        if (reverseHeld) sample.brake = 1;
-        const tools = input.sampleTools();
-        lastThrottle = sample.throttle;
-        if (tools.hook || tools.winchHeld) hideTutorial();
-        if (tools.hud) winchHud.toggle();
-        if (sample.reset) {
+        const raw = input.sample();
+        if (reverseHeld) raw.brake = 1;
+        const toolInput = input.sampleTools();
+        lastThrottle = raw.throttle;
+        if (toolInput.hook || toolInput.winchHeld) hideTutorial();
+        if (toolInput.hud) winchHud.toggle();
+        if (raw.reset) {
           car.reset();
           winch.reset();
+          tools.reset();
         }
-        if (sample.camera) cameraRig.cycle();
-        car.update(step, sample);
-        winch.update(step, tools);
-        world.step();
+        if (raw.camera) cameraRig.cycle();
+
+        // Tool routing: the rope wins G while it is attached, otherwise the
+        // selected tool owns the button. J only drives the W4 hydraulic jack.
+        const winchOwnsHook =
+          toolInput.hook &&
+          (winch.attachedAnchor !== null ||
+            winch.winchState === 'attaching' ||
+            tools.activeKind === 'winch');
+        winch.setSuppressed(
+          tools.controlsLocked ||
+            !(
+              tools.activeKind === 'winch' ||
+              winch.attachedAnchor !== null ||
+              winch.winchState === 'attaching' ||
+              winch.winchState === 'broken' ||
+              winch.winchState === 'anchorFailed'
+            ),
+        );
+
+        const drive = tools.controlsLocked ? IDLE_DRIVE : raw;
+        car.update(step, drive);
+        winch.update(step, {
+          ...toolInput,
+          hook: winchOwnsHook,
+          right: false,
+        });
+        tools.update(step, {
+          ...toolInput,
+          hook: toolInput.hook && !winchOwnsHook,
+        });
+        world.step(eventQueue);
+        tools.handleContactEvents(eventQueue);
         car.sync(step);
       },
       render: (_alpha, frameTime) => {
@@ -198,6 +252,7 @@ async function boot(): Promise<void> {
         cameraRig.update(frameTime, input);
         effects.update(frameTime, car);
         winch.sync(frameTime);
+        tools.sync();
         const water = track.waterAt(position.x, position.z);
         hud.update(
           car.speedKmh,
@@ -235,7 +290,15 @@ async function boot(): Promise<void> {
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    window.__superagent = { car, world, input, cameraRig, winch, anchors };
+    window.__superagent = {
+      car,
+      world,
+      input,
+      cameraRig,
+      winch,
+      toolkit: tools,
+      anchors,
+    };
     loop.start();
     loading.classList.add('hidden');
   } catch (cause) {

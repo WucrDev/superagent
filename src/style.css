@@ -620,3 +620,320 @@ body {
     bottom: calc(200px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* W4 #23: vehicle condition bar in the main HUD. */
+#hud .health {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: #b8c7a8;
+  font-size: 11px;
+}
+
+#hud .health-label {
+  letter-spacing: 0.04em;
+}
+
+#hud .health-track {
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#healthFill {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #7fb26a;
+  transition: width 140ms linear, background 140ms linear;
+}
+
+#healthFill.low {
+  background: #e2b34c;
+}
+
+#healthFill.critical {
+  background: #ff5544;
+}
+
+#healthText {
+  min-width: 2.2em;
+  color: #c8d5bd;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+#healthText.low {
+  color: #ffb4a2;
+}
+
+#hud #damageHint {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(120, 45, 40, 0.32);
+  color: #ffb4a2;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+#hud #damageHint[hidden] {
+  display: none;
+}
+
+/* W4 #24: always-visible tool strip, above the keyboard legend. */
+#toolStrip {
+  position: fixed;
+  left: 12px;
+  bottom: 42px;
+  z-index: 14;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: calc(100vw - 130px);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 6px;
+  border: 1px solid rgba(220, 235, 210, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 12, 8, 0.72);
+  color: #aebfa4;
+  font: 500 11px/1.2 inherit;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.tool-chip .tool-key {
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 3px;
+  border: 1px solid rgba(220, 235, 210, 0.22);
+  border-radius: 4px;
+  color: #dbe6d2;
+  font-size: 9px;
+  text-align: center;
+}
+
+.tool-chip .tool-count {
+  color: #f0c35a;
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-chip.active {
+  border-color: rgba(240, 195, 90, 0.75);
+  background: rgba(240, 195, 90, 0.2);
+  color: #f6e7bd;
+}
+
+.tool-chip.empty {
+  opacity: 0.45;
+}
+
+/* W4: tool-specific prompt sits above the winch prompt so both can coexist. */
+#toolPrompt {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  z-index: 13;
+  max-width: min(680px, calc(100vw - 40px));
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(10, 14, 10, 0.72);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color: #dbe6d2;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#toolPrompt[hidden] {
+  display: none;
+}
+
+#toolPrompt.warn {
+  border-color: rgba(240, 195, 90, 0.55);
+  color: #f0d28e;
+}
+
+#toolPrompt.danger {
+  border-color: rgba(255, 85, 68, 0.65);
+  color: #ffb4a2;
+}
+
+/* W4 #24: radial quick wheel. Hold T / gamepad View to open. */
+#toolWheel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 24;
+  width: min(360px, calc(100vw - 60px));
+  aspect-ratio: 1;
+  border: 1px solid rgba(220, 235, 210, 0.2);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(10, 14, 10, 0.55) 0%,
+    rgba(10, 14, 10, 0.82) 62%,
+    rgba(10, 14, 10, 0.72) 100%
+  );
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#toolWheel[hidden] {
+  display: none;
+}
+
+#toolWheel .wheel-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 46%;
+  color: #f0c35a;
+  font-size: 16px;
+  font-weight: 650;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+#toolWheel .wheel-center small {
+  color: #9fb18f;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+#toolWheel .wheel-slot {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 86px;
+  height: 86px;
+  padding: 0;
+  border: 1px solid rgba(220, 235, 210, 0.24);
+  border-radius: 50%;
+  background: rgba(8, 12, 8, 0.86);
+  color: #c8d5bd;
+  font: 500 12px/1.2 inherit;
+  cursor: pointer;
+}
+
+#toolWheel .wheel-slot.slot-top {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#toolWheel .wheel-slot.slot-right {
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+}
+
+#toolWheel .wheel-slot.slot-bottom {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#toolWheel .wheel-slot.slot-left {
+  top: 50%;
+  left: 6px;
+  transform: translateY(-50%);
+}
+
+#toolWheel .wheel-key {
+  color: #7e8c73;
+  font-size: 9px;
+}
+
+#toolWheel .wheel-name {
+  font-size: 12px;
+}
+
+#toolWheel .wheel-count {
+  color: #f0c35a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+#toolWheel .wheel-slot.active {
+  border-color: rgba(240, 195, 90, 0.85);
+  color: #f6e7bd;
+}
+
+#toolWheel .wheel-slot.highlight {
+  border-color: #f0c35a;
+  background: rgba(240, 195, 90, 0.24);
+  box-shadow: 0 0 0 4px rgba(240, 195, 90, 0.16);
+}
+
+#toolWheel .wheel-slot.empty {
+  opacity: 0.4;
+}
+
+@media (max-width: 600px) {
+  /* The bottom legend already lists the keys; dropping the long help block
+     keeps the phone HUD from covering most of the screen. */
+  #hud .help {
+    display: none;
+  }
+
+  #toolStrip {
+    bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+    flex-wrap: nowrap;
+    gap: 3px;
+    max-width: calc(100vw - 120px);
+    overflow: hidden;
+  }
+
+  .tool-chip {
+    gap: 3px;
+    padding: 2px 5px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .tool-chip .tool-key {
+    min-width: 11px;
+    font-size: 8px;
+  }
+
+  #toolPrompt {
+    bottom: calc(300px + env(safe-area-inset-bottom, 0px));
+    font-size: 11px;
+  }
+
+  #winchPrompt {
+    bottom: calc(240px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #winchHud {
+    bottom: calc(240px + env(safe-area-inset-bottom, 0px));
+  }
+}
