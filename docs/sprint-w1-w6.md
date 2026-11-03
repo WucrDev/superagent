@@ -21,9 +21,9 @@
 ## W1｜能开
 
 ### #1 项目骨架与版本锁定 `type/tech` `size/M`
-- 建 Unity 6 URP 工程，锁定版本；配 Git LFS（美术资产）；建 `Assets/Game/{Core,Vehicle,Terrain,Tools,UI}` 目录。
-- 固定步长 60 Hz 物理；输入走 Input System（手柄 + 键鼠）。
-- **验收**：新成员 clone 后 15 分钟内能跑起来；工程无编译警告。
+- 建 three.js + Rapier 的 Vite/TypeScript 工程，锁 npm 版本；配 Git LFS（美术资产）；建 `src/{core,vehicle,terrain,tools,ui}` 目录。
+- 固定步长 60 Hz 物理；输入统一走 InputManager（手柄 + 键鼠）。
+- **验收**：新成员 clone 后 15 分钟内能跑起来；`npm run typecheck`、`npm test`、`npm run build` 通过。
 
 ### #2 射线悬挂车辆 `type/gameplay` `size/L`
 - 每轮 8 条射线，弹簧-阻尼 + 上下限位；车身刚体质量/重心可配。

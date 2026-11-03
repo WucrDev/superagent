@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f0b" />
+    <title>Superagent · 越野灰盒原型</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud" aria-live="polite">
+      <div class="badge">W1 可玩 build · three.js + Rapier</div>
+      <div class="speed"><span id="speed">0</span><span class="unit">km/h</span></div>
+      <div class="meta">
+        <span class="gear" id="gear">L</span>
+        <span class="sep">/</span>
+        <span id="camera">第三人称</span>
+        <span class="sep">/</span>
+        <span id="device">键盘</span>
+      </div>
+      <div class="help">
+        WASD 或手柄左摇杆驾驶 · RT/LT 油门/刹车 · Q/E 换档 · C 视角 · Space 手刹 · R 复位<br />
+        右键拖动看 · 滚轮缩放 · Esc 设置
+      </div>
+    </div>
+
+    <div id="settings" hidden>
+      <h2>设置</h2>
+      <label>
+        手柄死区
+        <input id="deadzone" type="range" min="0" max="0.4" step="0.01" />
+        <span id="deadzoneValue">0.15</span>
+      </label>
+      <label>
+        转向灵敏度
+        <input id="steerSensitivity" type="range" min="0.5" max="2" step="0.05" />
+        <span id="steerValue">1.00</span>
+      </label>
+      <label>
+        第三人称 FOV
+        <input id="chaseFov" type="range" min="60" max="80" step="1" />
+        <span id="chaseFovValue">65°</span>
+      </label>
+      <label>
+        座舱 FOV
+        <input id="cockpitFov" type="range" min="60" max="90" step="1" />
+        <span id="cockpitFovValue">75°</span>
+      </label>
+      <button id="settingsClose" type="button">关闭 (Esc)</button>
+    </div>
+
+    <div id="loading">正在加载物理引擎…</div>
+    <div id="error" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
