@@ -74,6 +74,18 @@ describe('RaycastVehicle', () => {
     expect(rig.car.drivetrain.shifting).toBe(false);
   });
 
+  it('steers toward screen-right for positive steer input', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    simulate(rig, { ...IDLE, throttle: 1 }, 1);
+    const beforeX = rig.car.position.x;
+    simulate(rig, { ...IDLE, throttle: 1, steer: 1 }, 2);
+
+    // Chase camera sits behind the car: screen-right is world -X.
+    expect(rig.car.position.x).toBeLessThan(beforeX - 0.2);
+    expect(rig.car.forward.x).toBeLessThan(-0.05);
+  });
+
   it('reset returns the car to the spawn point and clears speed', () => {
     const rig = createRig();
     simulate(rig, { ...IDLE, throttle: 1 }, 1);
