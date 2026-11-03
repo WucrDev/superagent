@@ -290,3 +290,10 @@ After 同一位置的瞄准状态（H 打开张力条 + 角度环）：![W3 aim]
   - `typecheck` / `npm test`（49）/ `build` 全过。
 - Before（`42adb8c`，无底部控制条/倒车按钮）：![controls before](images/w3-controls-before.png)
 - After（最终 build，底部控制条 + build hash + 右下倒车按钮）：![controls after](images/w3-controls-after.png)
+
+## 线上最终验收（`Bf1fPu_C` / PR head `ec53f5a`）
+
+- 直接打开 `https://game.xiaoannurse.art/`，Chrome 156 headless 1280×720；线上 build `Bf1fPu_C`。
+- 通过：底部 `build`/控制条/右下「倒车」按钮存在；按 S → `最后按键：KeyS`、档位 R、后退；真实鼠标按住右下按钮 → 按钮 active、诊断“屏幕倒车按钮：按住中”、档位 R、后退；G 挂钩 → 已挂钩提示 → 按住 F 从 z≈-0.1 拉到 z≈7.1 → G 松绳回 ready；焦点卡失焦出现/聚焦自动隐藏；console error 0。
+- 限制：在练习锚点用手刹+收绳尝试自然断绳，张力到 14.7 kN（约 67%）未断；绳断/锚点脱落/灌木滑脱未在实时玩家路径重放，由 `winch.test.ts` 与既有 W3 证据覆盖。
+- 结论：**通过（附失败态未实时重放的限制）**；可合并。
