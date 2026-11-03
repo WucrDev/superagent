@@ -27,6 +27,8 @@
 - 复位：回到起点，速度 0，档位回 L。
 - 相机：chase → free → cockpit → chase；座舱截图见 [`w1-cockpit.png`](images/w1-cockpit.png)；30° 爬坡截图见 [`w1-climb.png`](images/w1-climb.png)。
 - 转向：D（+1）→ 车头朝世界 -X（追车画面右侧），A/D 与屏幕方向一致；有回归测试覆盖。
+  - 同一输入（自由视角，W 1.5 s 后按住 D 1.8 s）：修复前 3839b13 位移 x +3.35 m、车头 +0.70 rad（世界 +X / 画面左）；修复后 c105878 位移 x -3.88 m、车头 -0.75 rad（世界 -X / 画面右）。
+  - 截图：[修复前](images/w1-steer-before.png) / [修复后](images/w1-steer-after.png)。
 
 ## 录屏与截图
 
