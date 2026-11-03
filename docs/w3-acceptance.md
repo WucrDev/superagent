@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-BVFkGArs.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示与深水提示正常、HUD 与收绳正常，无 console error）
+- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-WZcO526t.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示正常、HUD 与收绳正常，无 console error）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
 - 结论：**实现与客观自测通过；主观手感、硬件手柄震动、盲测视频待人工验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
@@ -76,6 +76,24 @@ After（深水提示 + 锚点 C）：![water after](images/w3-water-hint.png)
 **S 刹车/倒挡**：S 刹车实测有效（13.8 → 1.3 km/h）；倒挡当前没有实现（W1 变速箱只有 L/H），属于车辆/变速箱功能，已作为新 ticket 交回评估，不夹带进 W3。深水脱困可先用绞盘或掉头驶出。
 
 线上 `index-BVFkGArs.js` 已验证：焦点卡可见、点击隐藏、失焦重现；深水提示出现；锚点 C 可选中；无 console error。
+
+### 第四次：G 按了还算没挂钩 / 操作是否被验收
+
+用户按 G 后截图仍是“瞄准”提示（旧文案写的是“F 收绳 · G 挂钩”，没说明要先按住 F，也没显示挂钩中），并质疑这个操作是否经过制作人验收。**答案：没有验收过**；制作人自检只跑通了状态机，没有验证这组操作是否好懂，W3 门禁未通过。
+
+修复：
+
+- 瞄准提示：`按住 F 瞄准 · G 挂钩 · X 换锚 · V 自动`（不再写“F 收绳”）。
+- 按 G 后 0.3 s 内显示 `挂钩中…（约 0.3 s）`，随后 `已挂钩 · 继续按住 F 收绳 · G 松绳 · H 张力条`；打滑时追加“轮胎打滑”。
+- 完整 HUD、帮助和教程同步为“按住 F 瞄准/收绳”。
+- 正确流程：**按住 F 瞄准 → 轻按 G → 等约 0.3 s → 继续按住 F 收绳；按 G 松绳**。
+
+Before（旧文案“F 收绳”，尚未挂钩）：![prompt before](images/w3-prompt-before.png)
+After 瞄准：![prompt aim](images/w3-prompt-aim.png)
+After 挂钩中：![prompt attaching](images/w3-prompt-attaching.png)
+After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
+
+线上 `index-WZcO526t.js` 已验证：瞄准/挂钩中/已挂钩三段提示正确，真实挂上 `spawn-tree`，无 console error。**若修完提示后仍觉得三键流程本身别扭，是否简化成“G 直接挂最近锚点”或单键流程，需要 owner 拍板。**
 
 ## 实机候选与张力（当前 PR）
 

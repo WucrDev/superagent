@@ -120,17 +120,22 @@ export class WinchHud {
       const remaining = (1 - snapshot.breakProgress) * 1.2;
       text = `即将断绳 ${remaining.toFixed(1)} s · 松开 F 卸力`;
       tone = 'danger';
+    } else if (snapshot.state === 'attaching') {
+      text = '挂钩中…（约 0.3 s）';
+    } else if (snapshot.attached) {
+      text = `已挂钩 · 继续按住 F 收绳 · G 松绳 · H 张力条${
+        snapshot.slipping ? ' · 轮胎打滑' : ''
+      }`;
+      tone = snapshot.slipping ? 'warn' : '';
     } else if (snapshot.slipping) {
       text = '轮胎打滑 · 力在，但地面抓不住';
       tone = 'warn';
     } else if (snapshot.state === 'aiming') {
       text = snapshot.selected
-        ? `F 收绳 · G 挂钩 · X 换锚 · V 自动 ｜ ${snapshot.selected.anchor.label}（评分 ${Math.round(
+        ? `按住 F 瞄准 · G 挂钩 · X 换锚 · V 自动 ｜ ${snapshot.selected.anchor.label}（评分 ${Math.round(
             snapshot.selected.score,
           )}）`
-        : `F 瞄准 ｜ ${snapshot.hint || '12 m / 60° 内没有可选锚点'}`;
-    } else if (snapshot.state === 'attaching' || snapshot.attached) {
-      text = 'F 收绳 · G 松绳 · H 张力条';
+        : `按住 F 瞄准 ｜ ${snapshot.hint || '12 m / 60° 内没有可选锚点'}`;
     }
 
     this.prompt.hidden = text === '';
