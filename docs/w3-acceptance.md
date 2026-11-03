@@ -178,6 +178,7 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 - 页面左上徽标和左下说明条现在都显示 `build Bf1fPu_C`；看到 build 号即可确认不是旧页面。
 - 截图：`w3-mobile-portrait.png` / `w3-mobile-reverse.png`。
 - 真实飞书 webview 的键盘焦点/输入法仍无法在 headless 复现；按钮是移动端/输入法路径的入口。
+- **所有者确认（2026-11-04 18:53）**：在浏览器使用 live `Bf1fPu_C` 确认“现在可以了”；之前看不到按钮是打开了旧页面/旧入口（本地或旧 build）。倒挡/按钮/移动端修复由所有者实测通过。
 
 ## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）
 
