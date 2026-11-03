@@ -16,7 +16,7 @@
 | #13 坡度查询（法线夹角） | 提供坡度 | `slopeDeg`：平地 0.0°，30° 坡 29.8°（轮速接触法线平均） |
 | #13 深水 >50 cm 进水 | 动力 -40%，10 s 恢复 | 入水后 `waterIngress` 0.94→1.0，`powerFactor` 0.62；同 3 s 静止加速：干地 34.0 km/h / 23.85 m，深水 26.9 km/h / 13.77 m |
 | #13 倒出来能恢复 | 10 s 恢复 | 出水后 ingress 1.00 → 0.50（5 s）→ 0（10 s）；power 0.60 → 0.80 → 1.00 |
-| #13 打滑粒子与拉痕 | 有 | 雪地打滑 6.68 m/s：轮胎拉痕 + 雪屑粒子（截图） |
+| #13 打滑粒子与拉痕 | 有 | 雪地打滑 5.84 m/s（本次复测，18 km/h）：轮胎拉痕 + 雪屑粒子（截图） |
 | #13 白烟 | 深水冒白烟 | 深水截图：车头白烟 + 水花粒子 |
 
 ## 材质参数（调优后）
@@ -146,9 +146,9 @@ After：![坡 after](images/w2-ramps-after.png)
 
 Before：![水 before](images/w2-water-before.png)
 After（静态）：![水 after](images/w2-water-after.png)
-After（行驶中，白烟 + 拉痕 + 水花）：![水 driving](images/w2-water-driving.png)
+After（行驶中，本 PR HEAD：白烟 + 拉痕 + 水花）：![水 driving](images/w2-water-driving.png)
 
-干土 30° 爬坡与雪地打滑：
+干土 30° 爬坡与雪地打滑（本 PR HEAD）：
 
 ![干土爬坡](images/w2-dry-ramp.png)
 ![雪地打滑](images/w2-snow-slip.png)
