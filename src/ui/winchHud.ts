@@ -77,7 +77,7 @@ export class WinchHud {
       ? `距离 ${snapshot.selected.distance.toFixed(1)} m · 角度 ${Math.round(
           snapshot.selected.angleDeg,
         )}° · 评分 ${Math.round(snapshot.selected.score)}`
-      : '12 m / 60° 内没有可挂锚点';
+      : snapshot.hint || '12 m / 60° 内没有可挂锚点';
     this.scoreElement.classList.toggle(
       'danger',
       snapshot.selected !== null && snapshot.selected.score < WINCH.autoScore,
@@ -128,7 +128,7 @@ export class WinchHud {
         ? `F 收绳 · G 挂钩 · X 换锚 · V 自动 ｜ ${snapshot.selected.anchor.label}（评分 ${Math.round(
             snapshot.selected.score,
           )}）`
-        : 'F 瞄准 ｜ 12 m / 60° 内没有可选锚点';
+        : `F 瞄准 ｜ ${snapshot.hint || '12 m / 60° 内没有可选锚点'}`;
     } else if (snapshot.state === 'attaching' || snapshot.attached) {
       text = 'F 收绳 · G 松绳 · H 张力条';
     }

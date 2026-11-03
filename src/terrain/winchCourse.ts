@@ -42,7 +42,10 @@ export function createWinchCourse(
   // Original W1 anchors (three trees) are now real, selectable W3 anchors.
   anchors.push(createTree(scene, world, 'anchor-a', '锚点 A', 13, 118));
   anchors.push(createTree(scene, world, 'anchor-b', '锚点 B', -16, 145));
-  anchors.push(createTree(scene, world, 'anchor-c', '锚点 C', 11, 210));
+  // Anchor C sits in the 80 cm deep water but close enough to the water centre
+  // to be reachable from the spot the driver naturally stops at; the original
+  // (11,210) was 13.5 m from (0,200), just outside the 12 m winch range.
+  anchors.push(createTree(scene, world, 'anchor-c', '锚点 C', 4, 206));
 
   // W3 winch pad: wet mud floor -> 35° ramp -> plateau with two trees.
   addBox(scene, world, field, {

@@ -55,6 +55,8 @@ export interface WinchSnapshot {
   load: number;
   selected: WinchCandidate | null;
   candidates: readonly WinchCandidate[];
+  /** Why auto-aim has no target (distance / cone / occlusion), shown to the player. */
+  hint: string;
   attached: WinchAnchor | null;
   breakProgress: number;
   stall: boolean;
@@ -99,6 +101,7 @@ export class Winch {
   private attached: WinchAnchor | null = null;
   private selected: WinchCandidate | null = null;
   private candidates: WinchCandidate[] = [];
+  private hint = '';
   private manual = false;
   private manualIndex = 0;
   private attachTimer = 0;
@@ -268,6 +271,7 @@ export class Winch {
       load: clamp(this.tension / this.maxTension, 0, 1.5),
       selected: this.selected,
       candidates: this.candidates,
+      hint: this.hint,
       attached: this.attached,
       breakProgress: clamp(this.overTension / WINCH.breakTime, 0, 1),
       stall: this.stallTimer > 0.4,
@@ -298,6 +302,7 @@ export class Winch {
     this.attached = null;
     this.selected = null;
     this.candidates = [];
+    this.hint = '';
     this.state = 'idle';
     this.tension = 0;
     this.overTension = 0;
@@ -359,6 +364,7 @@ export class Winch {
       this.state = 'idle';
       this.selected = null;
       this.candidates = [];
+      this.hint = '';
       this.reeling = false;
       this.car.setWinchAssist(false);
       this.car.setWinchLoad(0);
@@ -370,6 +376,7 @@ export class Winch {
       this.manual = false;
       this.selected = null;
       this.candidates = [];
+      this.hint = '';
       this.reeling = false;
       this.car.setWinchAssist(false);
       this.car.setWinchLoad(0);
@@ -400,6 +407,7 @@ export class Winch {
     } else {
       this.selected = pickAutoCandidate(this.candidates);
     }
+    this.hint = this.selected ? '' : this.buildAimHint();
 
     this.car.setWinchAssist(false);
     this.car.setWinchLoad(0);
@@ -407,6 +415,53 @@ export class Winch {
     if (input.hook && this.selected) {
       this.startAttach(this.selected);
     }
+  }
+
+  /**
+   * Turns "no target" into an actionable sentence: too far, outside the 60°
+   * auto cone (press X), occluded, or only a bush. Without this the player sees
+   * a close-looking anchor and the generic "12 m / 60° 内没有可选锚点".
+   */
+  private buildAimHint(): string {
+    const visible = this.candidates.filter(
+      (candidate) => candidate.visible && candidate.reachable,
+    );
+    const offCone = visible
+      .filter((candidate) => !candidate.inCone)
+      .sort((a, b) => b.score - a.score);
+    if (offCone.length > 0) {
+      const best = offCone[0]!;
+      return `锚点在 ${best.distance.toFixed(1)} m、${Math.round(
+        best.angleDeg,
+      )}° · 按 X 手动选（自动只选前方 60°）`;
+    }
+
+    const bush = visible.find((candidate) => !candidate.autoSelectable);
+    if (bush) return '细灌木不能自动选 · 按 X 手动选';
+
+    if (this.candidates.some((candidate) => !candidate.visible && candidate.reachable)) {
+      return '锚点被地形遮挡 · 换个位置或角度';
+    }
+
+    if (visible.length === 0) {
+      const hook = this.car.hookPoint;
+      let nearest: { anchor: WinchAnchor; distance: number } | null = null;
+      for (const anchor of this.anchors) {
+        if (anchor.status !== 'ok') continue;
+        const distance = anchor.attachPoint.distanceTo(hook);
+        if (!nearest || distance < nearest.distance) {
+          nearest = { anchor, distance };
+        }
+      }
+      if (nearest && nearest.distance <= 24) {
+        return `最近锚点 ${nearest.anchor.label} ${nearest.distance.toFixed(
+          1,
+        )} m · 再靠近到 12 m 内`;
+      }
+      return '附近 12 m 内没有锚点';
+    }
+
+    return '按 X 手动选锚点';
   }
 
   private startAttach(candidate: WinchCandidate): void {
@@ -608,6 +663,7 @@ export class Winch {
   private release(message: string, state: WinchState): void {
     this.attached = null;
     this.selected = null;
+    this.hint = '';
     this.state = state;
     this.reeling = false;
     this.targetLength = 0;
