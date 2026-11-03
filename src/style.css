@@ -361,12 +361,52 @@ body {
   font-size: 11px;
 }
 
+/* Persistent bottom control legend: keep the key bindings visible where the
+   player looks for them, including the reverse binding. */
+#controlBar {
+  position: fixed;
+  left: 50%;
+  bottom: 6px;
+  z-index: 14;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px 12px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 12px;
+  border: 1px solid rgba(220, 235, 210, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 12, 8, 0.78);
+  color: #aebfa4;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(6px);
+}
+
+#controlBar kbd {
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 4px;
+  border: 1px solid rgba(220, 235, 210, 0.22);
+  border-radius: 4px;
+  color: #dbe6d2;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+#controlBar .build-tag {
+  color: #6f8066;
+}
+
 /* W3 winch: compact prompt is always available; the full tension bar + angle
    ring is opt-in with H (immersive default per docs/winch-design.md §6). */
 #winchPrompt {
   position: fixed;
   left: 50%;
-  bottom: 26px;
+  bottom: 48px;
   z-index: 12;
   max-width: min(640px, calc(100vw - 40px));
   padding: 8px 14px;

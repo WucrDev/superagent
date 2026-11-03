@@ -265,3 +265,11 @@ After 同一位置的瞄准状态（H 打开张力条 + 角度环）：![W3 aim]
 - 自动化：`npm run typecheck`、`npm test`（49 tests）、`npm run build` 全过。
 - 未在实时玩家路径重放：绳断 / 锚点脱落 / 灌木滑脱（由 `winch.test.ts` 覆盖，W3 既有验收截图见上）；手柄震动、主观手感仍待项目所有者试玩。
 - 结论：**通过（附上述限制）**，可部署主链接；验收证据以本文件 + PR #43 为准。
+
+### 追加：底部控制条 + 键盘焦点恢复（2026-11-04）
+
+- 反馈：切到飞书后按 S 无反应；看不到倒挡；控制说明不在玩家预期的位置。
+- 修复：屏幕底部常驻控制条（含 `S 刹车 · 停稳按住 = 倒挡 R` 与 `build <hash>`）；窗口重新获得焦点或标签重新可见时自动隐藏焦点卡，不再要求额外点击。
+- 验收：焦点卡启动可见、失焦出现、聚焦自动隐藏；控制条含倒挡说明；按住 S 进 R 并后退；console error 0。
+- Before（`42adb8c`，无底部控制条）：![controls before](images/w3-controls-before.png)
+- After（本提交，底部控制条 + build hash）：![controls after](images/w3-controls-after.png)

@@ -127,6 +127,7 @@ async function boot(): Promise<void> {
     });
     window.addEventListener('focus', () => {
       pageFocused = true;
+      setFocusHint(false);
     });
     window.addEventListener('pointerdown', () => {
       pageFocused = true;
@@ -137,6 +138,9 @@ async function boot(): Promise<void> {
       lastKeyLabel = event.code || event.key || '?';
       lastKeyAt = performance.now();
       setFocusHint(false);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') setFocusHint(false);
     });
     const inputDiag = document.querySelector<HTMLElement>('#inputDiag');
 
@@ -157,6 +161,11 @@ async function boot(): Promise<void> {
       reverseButton?.addEventListener(type, () => setReverseHeld(false));
     }
     window.addEventListener('pointerup', () => setReverseHeld(false));
+
+    const buildTag = document.querySelector<HTMLElement>('#buildTag');
+    const scriptSrc = document.querySelector<HTMLScriptElement>('script[type="module"]')?.src ?? '';
+    const buildMatch = scriptSrc.match(/index-([^/]+)\.js/);
+    if (buildTag) buildTag.textContent = buildMatch ? `build ${buildMatch[1]}` : 'build dev';
 
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
