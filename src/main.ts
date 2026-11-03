@@ -122,9 +122,28 @@ async function boot(): Promise<void> {
     window.addEventListener('pointerdown', () => setFocusHint(false));
     window.addEventListener('keydown', () => setFocusHint(false));
 
+    // On-screen reverse: a held pointer is a held brake, so the normal
+    // standstill->R logic applies even when the browser/IME eats keydown.
+    const reverseButton = document.querySelector<HTMLButtonElement>('#reverseButton');
+    let reverseHeld = false;
+    const setReverseHeld = (held: boolean): void => {
+      reverseHeld = held;
+      reverseButton?.classList.toggle('active', held);
+    };
+    reverseButton?.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      reverseButton.setPointerCapture?.(event.pointerId);
+      setReverseHeld(true);
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
+      reverseButton?.addEventListener(type, () => setReverseHeld(false));
+    }
+    window.addEventListener('pointerup', () => setReverseHeld(false));
+
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
         const sample = input.sample();
+        if (reverseHeld) sample.brake = 1;
         const tools = input.sampleTools();
         lastThrottle = sample.throttle;
         if (tools.hook || tools.winchHeld) hideTutorial();

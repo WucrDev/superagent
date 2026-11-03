@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（单键交互 + 倒挡修复版；基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-6oAXVZPm.js`；单键交互与合并后的倒挡尚未部署，headless 验证使用本地 `npm run preview` 的 build）
+- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-CaUX03sE.js`；单键交互、合并后的倒挡和右下「倒车」按钮均已部署）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（49 tests）、`npm run build`
 - 交付状态：**PR #43 为可审状态（前一轮设置；本轮 agent 未改 PR 状态、未合并、未部署）**。单键交互修复已完成自测；独立验收待安排，通过后才可合并。
 - 结论：**实现与客观自测通过；制作人验收未通过；单键交互与倒挡已通过 headless 预检，主观手感、操作可懂度、飞书焦点/输入法、硬件手柄震动、盲测视频仍待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
@@ -160,6 +160,14 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 **仍待人工/独立验收**：倒挡手感（接合时机、倒车速度、坡道倒车）与飞书焦点/输入法仍需制作人独立试玩；本 agent 未部署、未改 PR 状态。
 
 说明：断绳/拉不动的实机截图仍需固定车身做故障注入（当前地形自然持续陷车不足）；S 倒挡已在本轮补上，见上文「倒挡补充」。
+
+### 真实环境 S 倒挡不生效（owner 实测，2026-11-04）
+
+- 线上当前 build `index-CaUX03sE.js`。在真实 Chrome（headless + 真实按键事件）复测：静止按住 S 1.3 s → HUD `R`，车后退（z 146.99→145.68），无 console error；HUD 档位与 `car.gear` 联动正常。
+- owner 的浏览器/飞书环境里 S 不进游戏（焦点被飞书/输入法/其他窗口拿走）；此前的验收文档已明确“飞书内嵌 webview 键盘焦点与中文输入法无法在 headless 复现”，真实输入路径没有通过验收，却把自动化结果当成可用，属于半成品交付。
+- 修复：加右下角「倒车」按住按钮（`#reverseButton`），pointer 按住时直接给 brake=1，绕过键盘/输入法；HUD 同步显示 `R`。线上实测按住按钮 0.5 s → `R`，z 146.97→145.76；松开回 `L`；无 console error。帮助补“或按住右下「倒车」”，并保留焦点卡/切英文输入法提示。
+- 按钮截图：`w3-final-reverse-button.png`。
+- 真实路径（含按钮）仍待制作人/独立验收；不再宣称已验收。
 
 ## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）
 

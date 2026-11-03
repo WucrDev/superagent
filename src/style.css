@@ -115,6 +115,49 @@ body {
   display: none;
 }
 
+#reverseButton {
+  position: fixed;
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border: 1px solid rgba(240, 195, 90, 0.55);
+  border-radius: 50%;
+  background: rgba(10, 14, 10, 0.8);
+  color: #f0c35a;
+  font: 600 14px/1 system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#reverseButton span {
+  color: #9fb18f;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+#reverseButton.active {
+  border-color: #f0c35a;
+  background: rgba(240, 195, 90, 0.9);
+  color: #161a12;
+}
+
+#reverseButton.active span {
+  color: #3a3f2c;
+}
+
 #hud .help {
   margin-top: 12px;
   padding-top: 10px;
