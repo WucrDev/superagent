@@ -171,6 +171,14 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 - 线上实测：按 S → “最后按键：KeyS · 0.7 s 前”、gear R；失焦 → “页面失焦”；按住按钮 → “屏幕倒车按钮：按住中”、gear R、车后退；无 console error。截图：`w3-input-diag-keyboard.png` / `w3-input-diag-button.png`。
 - 真实路径（含按钮）仍待制作人/独立验收；不再宣称已验收。
 
+### 移动端竖屏与 build 号（owner 反馈“右下没有按钮”，2026-11-04）
+
+- 390×844 竖屏（isMobile/hasTouch）实测：右下「倒车」按钮 88 px，位于 y=652..740，在视口内且高于飞书/webview 底部工具栏；按住 → `R`、车后退（z 约 -1.2），松开回 L；无 console error。
+- 飞书/webview 底部工具栏可能盖住 `bottom: 18px` 的固定控件；移动端已把「倒车」抬到 `bottom: 104px`、底部说明条 96px、winch 提示/张力 HUD 200px，并加大按钮到 88px。
+- 页面左上徽标和左下说明条现在都显示 `build Bf1fPu_C`；看到 build 号即可确认不是旧页面。
+- 截图：`w3-mobile-portrait.png` / `w3-mobile-reverse.png`。
+- 真实飞书 webview 的键盘焦点/输入法仍无法在 headless 复现；按钮是移动端/输入法路径的入口。
+
 ## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）
 
 > 本节记录的是**单键交互修复前**的上一版 build（仍需按住 F 瞄准）；当前交互见上文「第五次反馈」。表中倒挡行为来自上一版自动倒挡（限速 15 km/h），合并后的统一实现见「倒挡补充」。

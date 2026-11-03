@@ -163,9 +163,12 @@ async function boot(): Promise<void> {
     window.addEventListener('pointerup', () => setReverseHeld(false));
 
     const buildTag = document.querySelector<HTMLElement>('#buildTag');
+    const buildTagTop = document.querySelector<HTMLElement>('#buildTagTop');
     const scriptSrc = document.querySelector<HTMLScriptElement>('script[type="module"]')?.src ?? '';
     const buildMatch = scriptSrc.match(/index-([^/]+)\.js/);
-    if (buildTag) buildTag.textContent = buildMatch ? `build ${buildMatch[1]}` : 'build dev';
+    const buildLabel = buildMatch ? `build ${buildMatch[1]}` : 'build dev';
+    if (buildTag) buildTag.textContent = buildLabel;
+    if (buildTagTop) buildTagTop.textContent = buildLabel;
 
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {

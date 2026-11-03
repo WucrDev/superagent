@@ -401,6 +401,16 @@ body {
   color: #6f8066;
 }
 
+#hud .badge .build-tag {
+  color: #6f8066;
+  font-weight: 400;
+}
+
+/* Phones: the Feishu/webview bottom toolbar can cover fixed controls at the
+   very bottom. Lift the touch controls and the bottom HUD above it, and make
+   the reverse target big enough to hit with a thumb. */
+
+
 /* W3 winch: compact prompt is always available; the full tension bar + angle
    ring is opt-in with H (immersive default per docs/winch-design.md §6). */
 #winchPrompt {
@@ -584,3 +594,29 @@ body {
   text-align: center;
 }
 
+/* Phone layout must come after all base rules so the winch prompt/HUD also clear the bottom toolbar. */
+@media (max-width: 600px) {
+  #reverseButton {
+    width: 88px;
+    height: 88px;
+    right: 14px;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    font-size: 16px;
+  }
+
+  #controlBar {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 130px);
+    font-size: 10px;
+  }
+
+  #winchPrompt {
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #winchHud {
+    right: 14px;
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  }
+}
