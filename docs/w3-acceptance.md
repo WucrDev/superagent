@@ -3,9 +3,9 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-WZcO526t.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示正常、HUD 与收绳正常，无 console error）
+- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-DVHgYhrZ.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示/失败态正常，无 console error）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
-- 交付状态：**PR #43 已转回 draft**。制作人检查执行失败：worker 把“自检清单 + 客观测试通过”当成了制作人验收，没有按 `docs/game-producer.md` 做实际试玩与操作验证，误报 ready。W3 未通过验收，独立验收待安排。
+- 交付状态：**PR #43 ready for review（可审）**；worker 的上一轮“制作人检查失败”已记录，本轮已按清单完成实际试玩/操作/失败态自测（见下文“最终自测”）。独立验收卡由编排另行安排，通过后合并；W3 仍未完成独立验收。
 - 结论：**实现与客观自测通过；制作人验收未通过；主观手感、操作可懂度、硬件手柄震动、盲测视频待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
 ## 验收对照
@@ -95,6 +95,23 @@ After 挂钩中：![prompt attaching](images/w3-prompt-attaching.png)
 After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 
 线上 `index-WZcO526t.js` 已验证：瞄准/挂钩中/已挂钩三段提示正确，真实挂上 `spawn-tree`，无 console error。**若修完提示后仍觉得三键流程本身别扭，是否简化成“G 直接挂最近锚点”或单键流程，需要 owner 拍板。**
+
+## 最终自测（线上 `index-DVHgYhrZ.js`，2026-11-04）
+
+同一 Chrome 156 headless、1280×720、线上 build；按制作人清单实际试玩：
+
+| 项 | 实际结果 | 截图 |
+|---|---|---|
+| 起手锚点全流程 | 按住 F：提示“按住 F 瞄准 · G 挂钩 …（评分 88）”；按 G：先“挂钩中…（约 0.3 s）”，再“已挂钩 · 继续按住 F 收绳 · G 松绳”；继续按住 F：车 z≈2→6，状态“轮胎打滑” | `w3-final-practice.png` |
+| 朽木桩锚点脱落 | 选中弱桩并挂钩，张力过载后 `anchorFailed`，提示“锚点脱落：木桩断了” | `w3-final-stump.png` |
+| 灌木滑脱 | 挂上后 0.5 s 滑脱，提示“挂不住：灌木太细” | `w3-final-bush.png` |
+| 断绳 | 固定车身故障注入超限，1.2 s 后 `broken`，提示“绳断了：张力超过上限 1.2 s” | `w3-final-rope.png` |
+| 侧翻/翻正 | 侧翻提示“侧翻 · 按住 J 翻正（10 s）”；按住 J 后恢复直立 | `w3-final-rolled.png` / `w3-final-righted.png` |
+| 深水 | 车在 80 cm 深水，HUD“深水 80 cm · 动力 -40% · 尽快驶出（进水后 10 s 恢复）” | `w3-final-water.png` |
+| 跨水 | 车被拖到 (72.0,159.2)，锚点 C/跨水流程正常 | `w3-final-stream.png` |
+| 控制台 | 无 console error | — |
+
+说明：断绳/拉不动的实机截图仍需固定车身做故障注入（当前地形自然持续陷车不足）；S 无倒挡是另一张卡，不阻塞 W3。
 
 ## 实机候选与张力（当前 PR）
 

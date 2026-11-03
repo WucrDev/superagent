@@ -131,11 +131,16 @@ export class WinchHud {
       text = '轮胎打滑 · 力在，但地面抓不住';
       tone = 'warn';
     } else if (snapshot.state === 'aiming') {
-      text = snapshot.selected
-        ? `按住 F 瞄准 · G 挂钩 · X 换锚 · V 自动 ｜ ${snapshot.selected.anchor.label}（评分 ${Math.round(
-            snapshot.selected.score,
-          )}）`
-        : `按住 F 瞄准 ｜ ${snapshot.hint || '12 m / 60° 内没有可选锚点'}`;
+      text = snapshot.message
+        ? snapshot.message
+        : snapshot.selected
+          ? `按住 F 瞄准 · G 挂钩 · X 换锚 · V 自动 ｜ ${snapshot.selected.anchor.label}（评分 ${Math.round(
+              snapshot.selected.score,
+            )}）`
+          : `按住 F 瞄准 ｜ ${snapshot.hint || '12 m / 60° 内没有可选锚点'}`;
+    } else if (snapshot.message) {
+      text = snapshot.message;
+      tone = /断|脱落|挂不住/.test(snapshot.message) ? 'danger' : 'warn';
     }
 
     this.prompt.hidden = text === '';
