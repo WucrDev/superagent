@@ -1,0 +1,89 @@
+# W3 绞盘验收自测（锚点、绳索、张力、失败态）
+
+- 日期：2026-11-04
+- 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
+- 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
+- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-DHKJysoI.js`；线上验证 9 个锚点、选中泥坑树 A、收绳张力 13.7 kN，无 console error）
+- 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
+- 结论：**实现与客观自测通过；主观手感、硬件手柄震动、盲测视频待人工验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
+
+## 验收对照
+
+| W3 任务 | 验收标准 | 结果 | 证据 |
+|---|---|---|---|
+| #16 锚点检测与评分 | 12 m / 60° 锥体射线；可挂类型表；评分公式；遮挡剔除；高亮 | 9 个锚点：树干 ×6（含跨水树）、大岩石、木桩（弱实例）、细灌木；可挂类型表在 `anchorTypes.ts`；评分按 §3.2；射线遮挡 + 红色低分高亮；瞄准时菱形标记与底座环 | `npm test` 的 `winchMath` 13 项；`docs/images/w3-aim.png` |
+| #16 两个反例 | 近锚拽车头、跨水横拖 | 跨水：车从 (69,153) 被拖到 (72.0,159.2)，进水 0.24；近/偏角：灌木 2.7 m/70°、岩石 5.7 m/76° 手动可选、评分 0 显示红色 | `w3-cross-water.png`；截图 `w3-aim.png` 的红色点 |
+| #17 绳索物理与收绳 | 16 段 PBD、4 次迭代；刚度 0.6、阻尼 0.15、最大伸长 8%；收绳 0.8–2.0 m/s；松绳与断开 | 16 段 PBD 实现；端点拉伸计算张力；收绳随负载 2.0→0.8 m/s；松开 F 自动放绳变松；断绳后绳体落地 | `rope.test.ts` 5 项；`winch.test.ts` 泥坡脱困 |
+| #17 8 m 外的树拉出泥坑 ≤6 s | 收绳把车拖出泥坑 | 35° 湿泥坡试验：1.95 s 从坡底到坡顶；实机（1280×720 headless）从 z=147 拉到 z=154.8 | `winch.test.ts` 输出 `wet-mud ramp escape: 1.95 s`；`w3-pull.png` |
+| #18 自动/手动锚与角度环 | 自动取最高分；精瞄切换；角度环 HUD（可关） | 自动选中泥坑树 A（74.3 分，10°/8.75 m）；手动 X 可选弱木桩/灌木；V 回自动；H 开关张力条 + 角度环，默认关 | 实测候选表见下；`w3-aim.png`；`winchMath.test.ts` 选择测试 |
+| #19 张力模型与视听反馈 | 需求拉力 vs 实际拉力；打滑粒子/拉痕；电机三段音；手柄震动 | 弹簧 + 速度阻尼张力；实机收绳 11.8 kN（0.53 上限）；打滑时轮胎拉痕与泥屑；HUD/提示区分“收绳中 / 拉不动 / 轮胎打滑 / 即将断绳 / 绳断了”；电机三档与断绳/断锚合成音；手柄双马达震动代码 | `w3-pull.png`、`w3-stall.png`、`w3-cross-water.png`、`w3-rope-break.png` |
+| #19 三种状态可区分 | 拉不动 / 打滑 / 断绳，仅凭视听可区分 | HUD 文字 + 张力条颜色 + 绳色变白 + 轮胎粒子/拉痕 + 合成音；主观可读性待人工 | 同上；音频需人工听 |
+| #20 断绳 | 超限 1.2 s 断绳 + 0.8 m 回弹；可立即重挂 | 集成测试在超限后 1.42 s 断绳（含张力爬升），回弹 0.9 m/s，0.8 s 冷却后可重挂；实机 HUD“绳断了” | `winch.test.ts` 输出 `rope snap after 1.42 s`；`w3-rope-break.png` |
+| #20 锚点脱落 | 强度 < 需求 1.5 s；树断/石滚；车下滑 | 弱木桩（20 强度实例）在张力 21.7 kN 时脱落，HUD“锚点脱落：木桩断了”，车继续下滑；阈值与计时单元测试 | `w3-anchor-fail.png`；`winchMath.test.ts` |
+| #20 挂错（灌木） | 0.5 s 内脱落 + 提示 | 挂上后 0.82 s 脱落（0.3 s 挂钩 + 0.5 s 滑脱），提示“挂不住：灌木太细” | `winch.test.ts` 输出 `bush hook dropped after 0.82 s`；`w3-bush-slip.png` |
+| #20 侧翻 | 可千斤顶/翻正恢复 | 侧翻检测 `up.y < 0.35`；按住 J 10 s 翻正；实测 up.y 0.12 → 0.95 | `w3-rolled.png`、`w3-righted.png` |
+
+## 实机候选与张力（当前 PR）
+
+`__superagent.car.place(50, 147, 0)`、按住 F、打开 H：
+
+| 锚点 | 类型 | 分数 | 角度 | 距离 | 自动可选 | 备注 |
+|---|---|---|---:|---:|---|---|
+| 泥坑树 A | 树干 | 74.3 | 10.0° | 8.75 m | 是 | 自动选择的稳定锚 |
+| 泥坑树 B | 树干 | 59.0 | 17.8° | 8.53 m | 是 | 角度更大、分数更低 |
+| 朽木桩 | 木桩弱实例 | 35.5 | 21.4° | 9.67 m | 是 | 强度 20，会断 |
+| 细灌木 | 灌木 | 0 | 70.3° | 2.66 m | 否 | 手动可挂，0.5 s 脱落 |
+| 大岩石 | 岩石 | 0 | 75.9° | 5.72 m | 是 | 低分红色，手动可选 |
+
+- 收绳 1.2 s（实机 wall clock）：张力 11.8 kN，load 0.53，车从坡底开始爬。
+- 继续收绳：车到 (51.6, 2.16, 154.8)，张力降到 32 N（接近锚点、绳松）。
+- 跨水：车 (69,153) → (72.0,159.2)，水 ingress 0.24，状态“收绳中/轮胎打滑”。
+- 弱木桩：张力约 21.7 kN 持续到 1.5 s 计时后脱落，锚点 `failed`，车到 (52.4,1.84,153.8)。
+
+## 复现步骤
+
+1. `npm ci && npm run dev`，打开 `http://127.0.0.1:5173/`。
+2. 控制：`F` 按住瞄准/收绳；`G` 挂钩/松绳；`X` 切换手动锚；`V` 回自动；`J` 翻正；`H` 开关张力条 + 角度环；`R` 复位。
+3. 浏览器控制台：
+   - 绞盘试炼：`__superagent.car.place(50, 147, 0)`，按住 F，选锚后按 G。
+   - 弱木桩：按住 F 后 `__superagent.winch.selectAnchor('pad-stump')`，按 G；约 1.5 s 后断。
+   - 灌木：`__superagent.winch.selectAnchor('pad-bush')`，按 G。
+   - 跨水：`__superagent.car.place(69, 153, 0.44)`，按住 F，`__superagent.winch.selectAnchor('stream-tree')`，按 G。
+   - 侧翻：`__superagent.car.rigidBody.setRotation({x:0,y:0,z:0.7071,w:0.7071}, true)`，按住 J 10 s。
+   - 断绳/拉不动的故障注入：挂上后 `__superagent.car.rigidBody.setBodyType(1, true)`（固定车身）再按住 F；用完 `setBodyType(0, true)` 恢复。
+4. 单元/集成：`npx vitest run src/tools/winchMath.test.ts src/tools/rope.test.ts src/tools/winch.test.ts`。
+
+## 截图
+
+### Before / After（同一 1280×720、同一第三人称相机）
+
+Before：`main` 8e18123（W2，无 W3 地形/绞盘 HUD）。
+
+Before 出生点：![W3 before spawn](images/w3-before-spawn.png)
+After 出生点（本 PR HEAD，HUD 默认不显示绞盘面板）：![W3 after spawn](images/w3-spawn.png)
+
+Before 绞盘试炼位置（同一 `car.place(50,147,0)`，此时为空地）：![W3 before pad](images/w3-before-pad.png)
+After 同一位置的瞄准状态（H 打开张力条 + 角度环）：![W3 aim](images/w3-aim.png)
+
+> W2 基线没有绞盘、W3 测试地形和绞盘 HUD，因此绞盘交互本身不存在“Before 同状态”截图；上面对比的是同一位置、同一相机、同一视口的基线缺失状态。绞盘专用状态（收绳、打滑、断绳等）只能提供 After。
+
+### After：绞盘交互与失败态
+
+收绳起步（湿泥打滑、绳绷紧、张力条、角度环）：![W3 pull](images/w3-pull.png)
+拉不动（固定车身故障注入，HUD“拉不动” + 即将断绳提示）：![W3 stall](images/w3-stall.png)
+跨水横拖（车已进入水面）：![W3 cross water](images/w3-cross-water.png)
+绳断了（超限 1.2 s）：![W3 rope break](images/w3-rope-break.png)
+锚点脱落（朽木桩）：![W3 anchor fail](images/w3-anchor-fail.png)
+挂错灌木（0.5 s 滑脱）：![W3 bush slip](images/w3-bush-slip.png)
+侧翻：![W3 rolled](images/w3-rolled.png)
+翻正后：![W3 righted](images/w3-righted.png)
+
+## 已知限制 / 待人工验收
+
+- **“拉不动/绳断”实机截图使用固定车身**：当前灰盒地形里车会被 22 kN 绞盘拉动，自然出现持续“拉不动”需要更深的陷车地形；因此这两张失败态截图用固定车身做故障注入。逻辑、阈值与计时由 `winch.test.ts` 验证；这是地形内容缺口，不是状态机缺口。
+- **弱木桩是刻意弱实例（强度 20）**：设计表里木桩/电线杆强度为 60；为让“锚点脱落”可教学，W3 试炼场放了一个强度 20 的朽木桩实例，正常 60 强度木桩在当前坡道不一定断。
+- 设计文档 3.3 的“正前方 2 m、角度 80°”与“35° 坡正对/偏 20°”没有逐字复现：试炼场用 10°/17.8° 两棵树和 70°/76° 的灌木/岩石做角度差异；W2 的 35° 泥坡仍在原地。跨水反例已复现。
+- **联机/拖车**（设计 §8）不在 W3 单机范围；`vehicle` 锚点类型留在表里，未放实例。
+- 音频是合成音，未做混音；手柄震动代码已写，但当前环境没有手柄硬件，**待人工用手柄验收**。
+- 主观项（拉出瞬间“松一口气”、三种状态仅凭视听区分、30 秒盲测视频 8/10 看懂）**待人工试玩/录屏**，未代填。
+- 绞盘 HUD 默认关（设计 §6 沉浸优先）；按 H 打开。测试截图为了证据打开了 H。
