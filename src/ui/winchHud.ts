@@ -137,7 +137,11 @@ export class WinchHud {
       tone = 'warn';
     } else if (snapshot.cooldown > 0) {
       text = `已松绳 · ${snapshot.cooldown.toFixed(1)} s 后可再挂`;
-    } else if (snapshot.message) {
+    } else if (
+      snapshot.message &&
+      (!snapshot.selected ||
+        /断|脱落|挂不住|够不到|翻正/.test(snapshot.message))
+    ) {
       const hook = snapshot.selected
         ? ` · G 挂钩 · ${snapshot.selected.anchor.label}`
         : '';
