@@ -113,34 +113,47 @@ export class WinchHud {
       const remaining = (1 - snapshot.breakProgress) * 1.2;
       text =
         snapshot.breakProgress > 0.15
-          ? `拉不动 · 即将断绳 ${remaining.toFixed(1)} s · 松开 F 卸力`
-          : '拉不动 · 换个角度/锚点，或踩油门辅助';
+          ? `拉不动 · 即将断绳 ${remaining.toFixed(1)} s · 松开 F 卸力 · G 松绳`
+          : '拉不动 · 换个角度/锚点，或踩油门辅助 · G 松绳';
       tone = snapshot.breakProgress > 0.15 ? 'danger' : 'warn';
     } else if (snapshot.breakProgress > 0.15) {
       const remaining = (1 - snapshot.breakProgress) * 1.2;
-      text = `即将断绳 ${remaining.toFixed(1)} s · 松开 F 卸力`;
+      text = `即将断绳 ${remaining.toFixed(1)} s · 松开 F 卸力 · G 松绳`;
       tone = 'danger';
     } else if (snapshot.state === 'attaching') {
       text = '挂钩中…（约 0.3 s）';
     } else if (snapshot.attached) {
-      text = `已挂钩 · 继续按住 F 收绳 · G 松绳 · H 张力条${
+      const tension =
+        snapshot.tension > 1
+          ? `张力 ${Math.round(clamp(snapshot.load, 0, 1) * 100)}%`
+          : '绳松';
+      text = `已挂钩 · G 松绳 · 按住 F 收绳 · ${snapshot.attached.label} · ${tension}${
         snapshot.slipping ? ' · 轮胎打滑' : ''
       }`;
-      tone = snapshot.slipping ? 'warn' : '';
+      if (snapshot.load > 0.9) tone = 'danger';
+      else if (snapshot.load > 0.62 || snapshot.slipping) tone = 'warn';
     } else if (snapshot.slipping) {
       text = '轮胎打滑 · 力在，但地面抓不住';
       tone = 'warn';
-    } else if (snapshot.state === 'aiming') {
-      text = snapshot.message
-        ? snapshot.message
-        : snapshot.selected
-          ? `按住 F 瞄准 · G 挂钩 · X 换锚 · V 自动 ｜ ${snapshot.selected.anchor.label}（评分 ${Math.round(
-              snapshot.selected.score,
-            )}）`
-          : `按住 F 瞄准 ｜ ${snapshot.hint || '12 m / 60° 内没有可选锚点'}`;
+    } else if (snapshot.cooldown > 0) {
+      text = `已松绳 · ${snapshot.cooldown.toFixed(1)} s 后可再挂`;
     } else if (snapshot.message) {
-      text = snapshot.message;
+      const hook = snapshot.selected
+        ? ` · G 挂钩 · ${snapshot.selected.anchor.label}`
+        : '';
+      text = `${snapshot.message}${hook}`;
       tone = /断|脱落|挂不住/.test(snapshot.message) ? 'danger' : 'warn';
+    } else if (snapshot.selected) {
+      const anchor = snapshot.selected.anchor;
+      text = `G 挂钩 · ${anchor.label}`;
+      if (snapshot.selected.score < WINCH.autoScore) text += ' · 角度不佳';
+      text += snapshot.manual ? ' · X 下一个 · V 自动' : ' · X 换锚';
+      if (snapshot.selected.score < WINCH.autoScore) tone = 'warn';
+    } else {
+      text = `无可用锚点 · ${
+        snapshot.hint || '附近 12 m 内没有锚点 · 按 X 手动选'
+      }`;
+      tone = 'warn';
     }
 
     this.prompt.hidden = text === '';

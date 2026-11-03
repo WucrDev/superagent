@@ -23,8 +23,7 @@ import {
 } from './winchMath';
 
 export type WinchState =
-  | 'idle'
-  | 'aiming'
+  | 'ready'
   | 'attaching'
   | 'attached'
   | 'broken'
@@ -58,6 +57,10 @@ export interface WinchSnapshot {
   /** Why auto-aim has no target (distance / cone / occlusion), shown to the player. */
   hint: string;
   attached: WinchAnchor | null;
+  /** Manual anchor cycling is active (X); V returns to automatic selection. */
+  manual: boolean;
+  /** Seconds left before an anchor can be hooked again after a release. */
+  cooldown: number;
   breakProgress: number;
   stall: boolean;
   slipping: boolean;
@@ -79,11 +82,13 @@ const FAIL_FLASH_TIME = 1.8;
 /**
  * W3 #16–#20: the winch.
  *
- * State machine (docs/winch-design.md §2): idle -> aiming -> attaching ->
- * attached -> reeling/pull, with rope snap, anchor pull-out and rollover as
- * recoverable failure states. The physics force is applied at the car's front
- * hook; the rope itself is visual PBD. Feedback lives in `sync()` so the fixed
- * simulation step stays deterministic and cheap.
+ * Interaction (docs/winch-design.md §2): with no rope attached the winch is
+ * always in `ready`, automatically showing the best nearby anchor. Press G to
+ * hook it (no aim key), hold F to reel while attached, press G to release.
+ * X cycles manual anchors and V returns to automatic selection. The physics
+ * force is applied at the car's front hook; the rope itself is visual PBD.
+ * Feedback lives in `sync()` so the fixed simulation step stays deterministic
+ * and cheap.
  */
 export class Winch {
   private readonly maxTension: number;
@@ -97,7 +102,7 @@ export class Winch {
   private readonly markerGeometry: THREE.OctahedronGeometry;
   private readonly markers = new Map<string, THREE.Mesh>();
 
-  private state: WinchState = 'idle';
+  private state: WinchState = 'ready';
   private attached: WinchAnchor | null = null;
   private selected: WinchCandidate | null = null;
   private candidates: WinchCandidate[] = [];
@@ -202,7 +207,7 @@ export class Winch {
     this.messageTimer = Math.max(0, this.messageTimer - dt);
     if (this.messageTimer <= 0) this.message = '';
     if (this.failFlash <= 0 && (this.state === 'broken' || this.state === 'anchorFailed')) {
-      this.state = 'idle';
+      this.state = 'ready';
     }
 
     this.updateRighting(dt, input);
@@ -217,7 +222,7 @@ export class Winch {
       this.car.setWinchLoad(0);
       return;
     }
-    if (this.state === 'rolled') this.state = 'idle';
+    if (this.state === 'rolled') this.state = 'ready';
 
     if (this.failFlash > 0 && this.failState !== 'none') {
       this.state = this.failState === 'broken' ? 'broken' : 'anchorFailed';
@@ -239,7 +244,7 @@ export class Winch {
       return;
     }
 
-    this.updateAiming(input);
+    this.updateReady(input);
   }
 
   /** Render-rate feedback: rope mesh, anchor markers, audio, haptics, HUD. */
@@ -273,6 +278,8 @@ export class Winch {
       candidates: this.candidates,
       hint: this.hint,
       attached: this.attached,
+      manual: this.manual,
+      cooldown: this.cooldown,
       breakProgress: clamp(this.overTension / WINCH.breakTime, 0, 1),
       stall: this.stallTimer > 0.4,
       slipping: this.slipTimer > 0.2,
@@ -303,7 +310,7 @@ export class Winch {
     this.selected = null;
     this.candidates = [];
     this.hint = '';
-    this.state = 'idle';
+    this.state = 'ready';
     this.tension = 0;
     this.overTension = 0;
     this.anchorLoad = 0;
@@ -317,6 +324,8 @@ export class Winch {
     this.fallTimer = 0;
     this.rightProgress = 0;
     this.reeling = false;
+    this.manual = false;
+    this.manualIndex = 0;
     this.targetLength = 0;
     this.message = '';
     this.messageTimer = 0;
@@ -359,32 +368,24 @@ export class Winch {
     }
   }
 
-  private updateAiming(input: ToolInput): void {
-    if (this.cooldown > 0) {
-      this.state = 'idle';
-      this.selected = null;
-      this.candidates = [];
-      this.hint = '';
-      this.reeling = false;
-      this.car.setWinchAssist(false);
-      this.car.setWinchLoad(0);
-      return;
-    }
-
-    if (!input.winchHeld) {
-      this.state = 'idle';
-      this.manual = false;
-      this.selected = null;
-      this.candidates = [];
-      this.hint = '';
-      this.reeling = false;
-      this.car.setWinchAssist(false);
-      this.car.setWinchLoad(0);
-      return;
-    }
-
-    this.state = 'aiming';
+  /**
+   * No rope attached: automatically pick and show the best nearby anchor, so
+   * hooking is a single G press (the old "hold F to aim" step is gone). X
+   * cycles manual anchors, V returns to the automatic pick.
+   */
+  private updateReady(input: ToolInput): void {
+    this.state = 'ready';
     this.reeling = false;
+    this.car.setWinchAssist(false);
+    this.car.setWinchLoad(0);
+
+    if (this.cooldown > 0) {
+      this.selected = null;
+      this.candidates = [];
+      this.hint = '';
+      return;
+    }
+
     this.candidates = this.computeCandidates();
 
     if (input.cycle) {
@@ -408,9 +409,6 @@ export class Winch {
       this.selected = pickAutoCandidate(this.candidates);
     }
     this.hint = this.selected ? '' : this.buildAimHint();
-
-    this.car.setWinchAssist(false);
-    this.car.setWinchLoad(0);
 
     if (input.hook && this.selected) {
       this.startAttach(this.selected);
@@ -438,6 +436,15 @@ export class Winch {
 
     const bush = visible.find((candidate) => !candidate.autoSelectable);
     if (bush) return '细灌木不能自动选 · 按 X 手动选';
+
+    const tooFar = this.candidates
+      .filter((candidate) => candidate.visible && !candidate.reachable)
+      .sort((a, b) => a.distance - b.distance)[0];
+    if (tooFar) {
+      return `锚点 ${tooFar.anchor.label} ${tooFar.distance.toFixed(
+        1,
+      )} m · 超过 10 m 绳长，再靠近`;
+    }
 
     if (this.candidates.some((candidate) => !candidate.visible && candidate.reachable)) {
       return '锚点被地形遮挡 · 换个位置或角度';
@@ -523,7 +530,7 @@ export class Winch {
     this.updateSelected(distance, anchor.attachPoint.y - hook.y);
 
     if (input.hook) {
-      this.release('已松绳', 'idle');
+      this.release('已松绳', 'ready');
       return;
     }
 
@@ -535,7 +542,7 @@ export class Winch {
       this.reeling = false;
       this.car.setWinchAssist(false);
       this.car.setWinchLoad(0);
-      if (this.bushTimer <= 0) this.release('挂不住：灌木太细', 'idle');
+      if (this.bushTimer <= 0) this.release('挂不住：灌木太细', 'ready');
       return;
     }
 
@@ -868,7 +875,7 @@ export class Winch {
       const showMarker =
         anchor.status === 'ok' &&
         candidate !== null &&
-        (this.state === 'aiming' || this.state === 'attaching' || active);
+        (this.state === 'ready' || this.state === 'attaching' || active);
 
       if (marker) {
         marker.visible = showMarker;
@@ -979,8 +986,10 @@ export class Winch {
     if (this.attached) {
       return this.tension > this.maxTension * 0.08 ? '受力' : '绳松';
     }
-    if (this.state === 'aiming') {
-      return this.selected ? '选择锚点' : '无可用锚点';
+    if (this.state === 'ready') {
+      if (this.cooldown > 0) return `可再挂 ${this.cooldown.toFixed(1)} s`;
+      if (this.selected) return this.manual ? '手动选锚' : '自动选锚';
+      return '无可用锚点';
     }
     return '绞盘待机';
   }

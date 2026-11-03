@@ -150,9 +150,7 @@ describe('W3 winch integration', () => {
       let moved = false;
       for (let stepIndex = 0; stepIndex < Math.ceil(6 / STEP); stepIndex += 1) {
         const tool =
-          stepIndex === 0
-            ? tools({ winchHeld: true, hook: true })
-            : tools({ winchHeld: true });
+          stepIndex === 0 ? tools({ hook: true }) : tools({ winchHeld: true });
         step(rig, tool);
         elapsed = (stepIndex + 1) * STEP;
         if (rig.car.position.z > 3.0 && rig.car.position.y > 1.4) {
@@ -181,7 +179,8 @@ describe('W3 winch integration', () => {
       const rig = createRig([anchor], { start: [0, 0, 0] });
       settle(rig);
 
-      step(rig, tools({ winchHeld: true, hook: true }));
+      // G alone hooks the auto-selected anchor; F is only for reeling.
+      step(rig, tools({ hook: true }));
       for (let stepIndex = 0; stepIndex < 30; stepIndex += 1) {
         step(rig, tools({ winchHeld: true }));
       }
@@ -217,9 +216,9 @@ describe('W3 winch integration', () => {
       const rig = createRig([bush], { start: [0, 0, 0] });
       settle(rig);
 
-      step(rig, tools({ winchHeld: true }));
+      step(rig, tools());
       expect(rig.winch.selectAnchor('bush')).toBe(true);
-      step(rig, tools({ winchHeld: true, hook: true }));
+      step(rig, tools({ hook: true }));
 
       let sawMessage = false;
       let detachTime = 0;
@@ -248,12 +247,12 @@ describe('W3 winch integration', () => {
       const rig = createRig([tree, bush], { start: [0, 0, 0] });
       settle(rig);
 
-      step(rig, tools({ winchHeld: true }));
+      step(rig, tools());
       expect(rig.winch.snapshot.selected?.anchor.id).toBe('tree');
       expect(rig.winch.snapshot.candidates).toHaveLength(2);
 
       expect(rig.winch.selectAnchor('bush')).toBe(true);
-      step(rig, tools({ winchHeld: true }));
+      step(rig, tools());
       expect(rig.winch.snapshot.selected?.anchor.id).toBe('bush');
     },
     30000,
@@ -263,12 +262,77 @@ describe('W3 winch integration', () => {
     const far = makeAnchor('tree', 'tree', 0, 13);
     const rig = createRig([far], { start: [0, 0, 0] });
     settle(rig);
-    step(rig, tools({ winchHeld: true }));
+    step(rig, tools());
     expect(rig.winch.snapshot.candidates[0]?.reachable).toBe(false);
     expect(rig.winch.selectAnchor('tree')).toBe(true);
-    step(rig, tools({ winchHeld: true, hook: true }));
+    step(rig, tools({ hook: true }));
     expect(rig.winch.attachedAnchor).toBeNull();
     expect(rig.winch.snapshot.message).toContain('绳长');
     expect(WINCH.ropeLength).toBe(10);
+  });
+});
+
+describe('W3 single-key winch interaction', () => {
+  it('hooks the auto-selected anchor with one G press, no F aim', () => {
+    const anchor = makeAnchor('tree', 'tree', 0, 7);
+    const rig = createRig([anchor], { start: [0, 0, 0] });
+    settle(rig);
+
+    // No input needed to see the target: the winch is ready and auto-selects.
+    expect(rig.winch.snapshot.state).toBe('ready');
+    expect(rig.winch.snapshot.selected?.anchor.id).toBe('tree');
+    expect(rig.winch.snapshot.reeling).toBe(false);
+
+    step(rig, tools({ hook: true }));
+    expect(rig.winch.attachedAnchor?.id).toBe('tree');
+
+    for (let stepIndex = 0; stepIndex < 20; stepIndex += 1) step(rig, tools());
+    expect(rig.winch.winchState).toBe('attached');
+    expect(rig.winch.snapshot.attached?.id).toBe('tree');
+  });
+
+  it('reels with F and releases with G', () => {
+    const anchor = makeAnchor('tree', 'tree', 0, 9);
+    const rig = createRig([anchor], { start: [0, 0, 0] });
+    settle(rig);
+
+    step(rig, tools({ hook: true }));
+    for (let stepIndex = 0; stepIndex < 20; stepIndex += 1) step(rig, tools());
+    expect(rig.winch.winchState).toBe('attached');
+
+    const startDistance = rig.car.hookPoint.distanceTo(anchor.attachPoint);
+    let reelingFrames = 0;
+    for (let stepIndex = 0; stepIndex < 45; stepIndex += 1) {
+      step(rig, tools({ winchHeld: true }));
+      if (rig.winch.snapshot.reeling) reelingFrames += 1;
+    }
+    const reeledDistance = rig.car.hookPoint.distanceTo(anchor.attachPoint);
+    expect(reelingFrames).toBeGreaterThan(30);
+    expect(reeledDistance).toBeLessThan(startDistance - 0.5);
+
+    step(rig, tools({ hook: true }));
+    expect(rig.winch.attachedAnchor).toBeNull();
+    expect(rig.winch.snapshot.state).toBe('ready');
+    expect(rig.winch.snapshot.message).toContain('已松绳');
+  });
+
+  it('requires X to hook an anchor outside the 60° auto cone', () => {
+    // From the hook point the horizontal delta is (7.5, 3.75): ~63.4°, just
+    // outside the 60° auto cone but inside the 10 m rope.
+    const anchor = makeAnchor('tree', 'tree', 7.5, 5.9);
+    const rig = createRig([anchor], { start: [0, 0, 0] });
+    settle(rig);
+
+    expect(rig.winch.snapshot.candidates).toHaveLength(1);
+    expect(rig.winch.snapshot.candidates[0]?.inCone).toBe(false);
+    expect(rig.winch.snapshot.selected).toBeNull();
+    expect(rig.winch.snapshot.hint).toContain('按 X');
+
+    step(rig, tools({ cycle: true }));
+    expect(rig.winch.snapshot.manual).toBe(true);
+    expect(rig.winch.snapshot.selected?.anchor.id).toBe('tree');
+
+    step(rig, tools({ hook: true }));
+    expect(rig.winch.attachedAnchor?.id).toBe('tree');
   });
 });

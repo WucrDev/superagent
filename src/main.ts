@@ -127,7 +127,7 @@ async function boot(): Promise<void> {
         const sample = input.sample();
         const tools = input.sampleTools();
         lastThrottle = sample.throttle;
-        if (tools.winchHeld) hideTutorial();
+        if (tools.hook || tools.winchHeld) hideTutorial();
         if (tools.hud) winchHud.toggle();
         if (sample.reset) {
           car.reset();

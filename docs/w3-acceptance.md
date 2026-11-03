@@ -1,12 +1,12 @@
 # W3 绞盘验收自测（锚点、绳索、张力、失败态）
 
 - 日期：2026-11-04
-- 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
+- 构建：W3 绞盘 PR HEAD（单键交互修复版；基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-6oAXVZPm.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示/失败态正常，无 console error）
-- 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
-- 交付状态：**PR #43 ready for review（可审）**；worker 的上一轮“制作人检查失败”已记录，本轮已按清单完成实际试玩/操作/失败态自测（见下文“最终自测”）。独立验收卡由编排另行安排，通过后合并；W3 仍未完成独立验收。
-- 结论：**实现与客观自测通过；制作人验收未通过；主观手感、操作可懂度、硬件手柄震动、盲测视频待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
+- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-6oAXVZPm.js`；单键交互尚未部署，headless 验证使用本地 `npm run preview` 的 build）
+- 自测命令：`npm ci`、`npm run typecheck`、`npm test`（45 tests）、`npm run build`
+- 交付状态：**PR #43 为可审状态（前一轮设置；本轮 agent 未改 PR 状态、未合并、未部署）**。单键交互修复已完成自测；独立验收待安排，通过后才可合并。
+- 结论：**实现与客观自测通过；制作人验收未通过；单键交互修复已通过 headless 预检，主观手感、操作可懂度、飞书焦点/输入法、硬件手柄震动、盲测视频仍待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
 ## 验收对照
 
@@ -16,7 +16,7 @@
 | #16 两个反例 | 近锚拽车头、跨水横拖 | 跨水：车从 (69,153) 被拖到 (72.0,159.2)，进水 0.24；近/偏角：灌木 2.7 m/70°、岩石 5.7 m/76° 手动可选、评分 0 显示红色 | `w3-cross-water.png`；截图 `w3-aim.png` 的红色点 |
 | #17 绳索物理与收绳 | 16 段 PBD、4 次迭代；刚度 0.6、阻尼 0.15、最大伸长 8%；收绳 0.8–2.0 m/s；松绳与断开 | 16 段 PBD 实现；端点拉伸计算张力；收绳随负载 2.0→0.8 m/s；松开 F 自动放绳变松；断绳后绳体落地 | `rope.test.ts` 5 项；`winch.test.ts` 泥坡脱困 |
 | #17 8 m 外的树拉出泥坑 ≤6 s | 收绳把车拖出泥坑 | 35° 湿泥坡试验：1.95 s 从坡底到坡顶；实机（1280×720 headless）从 z=147 拉到 z=154.8 | `winch.test.ts` 输出 `wet-mud ramp escape: 1.95 s`；`w3-pull.png` |
-| #18 自动/手动锚与角度环 | 自动取最高分；精瞄切换；角度环 HUD（可关） | 自动选中泥坑树 A（74.3 分，10°/8.75 m）；手动 X 可选弱木桩/灌木；V 回自动；H 开关张力条 + 角度环，默认关 | 实测候选表见下；`w3-aim.png`；`winchMath.test.ts` 选择测试 |
+| #18 自动/手动锚与角度环 | 自动取最高分；X 手动循环 / V 回自动（无需瞄准键）；角度环 HUD（可关） | 自动选中泥坑树 A（74.3 分，10°/8.75 m）；手动 X 可选弱木桩/灌木；V 回自动；H 开关张力条 + 角度环，默认关 | 实测候选表见下；`w3-aim.png`；`winchMath.test.ts` 选择测试 |
 | #19 张力模型与视听反馈 | 需求拉力 vs 实际拉力；打滑粒子/拉痕；电机三段音；手柄震动 | 弹簧 + 速度阻尼张力；实机收绳 11.8 kN（0.53 上限）；打滑时轮胎拉痕与泥屑；HUD/提示区分“收绳中 / 拉不动 / 轮胎打滑 / 即将断绳 / 绳断了”；电机三档与断绳/断锚合成音；手柄双马达震动代码 | `w3-pull.png`、`w3-stall.png`、`w3-cross-water.png`、`w3-rope-break.png` |
 | #19 三种状态可区分 | 拉不动 / 打滑 / 断绳，仅凭视听可区分 | HUD 文字 + 张力条颜色 + 绳色变白 + 轮胎粒子/拉痕 + 合成音；主观可读性待人工 | 同上；音频需人工听 |
 | #20 断绳 | 超限 1.2 s 断绳 + 0.8 m 回弹；可立即重挂 | 集成测试在超限后 1.42 s 断绳（含张力爬升），回弹 0.9 m/s，0.8 s 冷却后可重挂；实机 HUD“绳断了” | `winch.test.ts` 输出 `rope snap after 1.42 s`；`w3-rope-break.png` |
@@ -25,6 +25,8 @@
 | #20 侧翻 | 可千斤顶/翻正恢复 | 侧翻检测 `up.y < 0.35`；按住 J 10 s 翻正；实测 up.y 0.12 → 0.95 | `w3-rolled.png`、`w3-righted.png` |
 
 ## 试玩反馈修复（2026-11-04）
+
+> 第 1–4 次反馈记录的是历史 build 的修复过程；**当前交互以「第五次反馈」为准**：G 直接挂钩，按住 F 收绳，再按 G 松绳，不再需要按住 F 瞄准。
 
 ### 第一次反馈：出生点按 F/G 没反应
 
@@ -87,16 +89,49 @@ After（深水提示 + 锚点 C）：![water after](images/w3-water-hint.png)
 - 瞄准提示：`按住 F 瞄准 · G 挂钩 · X 换锚 · V 自动`（不再写“F 收绳”）。
 - 按 G 后 0.3 s 内显示 `挂钩中…（约 0.3 s）`，随后 `已挂钩 · 继续按住 F 收绳 · G 松绳 · H 张力条`；打滑时追加“轮胎打滑”。
 - 完整 HUD、帮助和教程同步为“按住 F 瞄准/收绳”。
-- 正确流程：**按住 F 瞄准 → 轻按 G → 等约 0.3 s → 继续按住 F 收绳；按 G 松绳**。
+- 当时的流程（已被第五次反馈取代）：**按住 F 瞄准 → 轻按 G → 等约 0.3 s → 继续按住 F 收绳；按 G 松绳**。
 
 Before（旧文案“F 收绳”，尚未挂钩）：![prompt before](images/w3-prompt-before.png)
 After 瞄准：![prompt aim](images/w3-prompt-aim.png)
 After 挂钩中：![prompt attaching](images/w3-prompt-attaching.png)
 After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 
-线上 `index-WZcO526t.js` 已验证：瞄准/挂钩中/已挂钩三段提示正确，真实挂上 `spawn-tree`，无 console error。**若修完提示后仍觉得三键流程本身别扭，是否简化成“G 直接挂最近锚点”或单键流程，需要 owner 拍板。**
+线上 `index-WZcO526t.js` 已验证：瞄准/挂钩中/已挂钩三段提示正确，真实挂上 `spawn-tree`，无 console error。**若修完提示后仍觉得三键流程本身别扭，是否简化成“G 直接挂最近锚点”或单键流程，需要 owner 拍板。**（已由第五次反馈采纳：G 直接挂钩。）
+
+### 第五次反馈：按住 F 再按 G 不合理，改成 G 直接挂钩（2026-11-04）
+
+**反馈**：owner 认为“按住 F 瞄准，再按 G 挂钩”不合理；按 G 后提示仍停在“G 挂钩”，看不出是否挂上，也没有清楚的绳/张力反馈；切到飞书后所有按键失效（焦点/输入法）。
+
+**改动**：
+
+- 删除 F 瞄准状态：无绳时常驻 Ready，自动选择前方 60° 内评分最高的锚点，提示 `G 挂钩 · <锚点>`。
+- G 直接挂钩/松绳；挂上后按住 F 收绳；X 手动循环，V 回自动。只有一套操作，没有第二套瞄准键。
+- 已挂钩提示改为 `已挂钩 · G 松绳 · 按住 F 收绳 · <锚点> · 张力 63%`，低张力显示“绳松”；绳、锚点高亮、车身下沉与张力条（H）保持原反馈。
+- 无锚时按原因提示：超 12 m / 超 60°（按 X）/ 遮挡 / 灌木 / 超过 10 m 绳长。
+- 帮助和焦点卡补“按键没反应？点一下游戏画面，并把输入法切到英文”。
+- 物理、张力、断绳、锚点脱落、灌木滑脱、侧翻行为未改。
+
+**验证**：
+
+- `npm run typecheck` 通过。
+- `npm test`：45 tests 通过（新增 3 项：G 单击挂钩、F 收绳 + G 松绳、60° 外锚点用 X 选中；原有绞盘集成测试改为不按 F 直接 G）。
+- `npm run build` 通过（`index-Bu6tZEcz.js`）。
+- Chrome 156 headless（CDP，1280×720，`npm run preview` 的 build）实测：
+  - 无输入：`state=ready`，自动选中“起手锚点（练习）”，提示 `G 挂钩 · 起手锚点（练习） · X 换锚`。
+  - 单按 G（不按 F）：`state=attached`，提示 `已挂钩 · G 松绳 · 按住 F 收绳 · 起手锚点（练习） · 绳松`。
+  - 按住 F 1.1 s：`reeling=true`，张力 13.8 kN（load 63%），提示带 `张力 63%`。
+  - 再按 G：`state=ready`，提示 `已松绳 · 0.7 s 后可再挂`；0.8 s 后恢复自动选锚。
+  - 远离锚点：提示 `无可用锚点 · 最近锚点 起手锚点（练习） 23.3 m · 再靠近到 12 m 内`。
+  - console error 0。
+
+单按 G 后已挂钩（`已挂钩 · G 松绳 · 按住 F 收绳 · 起手锚点（练习） · 绳松`，可见绳与锚点标记）：![direct hook](images/w3-direct-hook.png)
+无锚点时的具体提示：![no anchor hint](images/w3-no-anchor-hint.png)
+
+**仍待人工/独立验收**：飞书内嵌 webview 的键盘焦点和中文输入法行为无法在 headless 复现；单键交互的可懂度、手感与“挂上没有”的主观确认仍需制作人独立试玩。
 
 ## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）
+
+> 本节记录的是**单键交互修复前**的上一版 build（仍需按住 F 瞄准）；当前交互见上文「第五次反馈」。
 
 同一 Chrome 156 headless、1280×720、线上 build；按制作人清单实际试玩：
 
@@ -116,7 +151,7 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 
 ## 实机候选与张力（当前 PR）
 
-`__superagent.car.place(50, 147, 0)`、按住 F、打开 H：
+`__superagent.car.place(50, 147, 0)`、无需按键即可自动选锚、打开 H：
 
 | 锚点 | 类型 | 分数 | 角度 | 距离 | 自动可选 | 备注 |
 |---|---|---|---:|---:|---|---|
@@ -134,12 +169,12 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 ## 复现步骤
 
 1. `npm ci && npm run dev`，打开 `http://127.0.0.1:5173/`。
-2. 控制：`F` 按住瞄准/收绳；`G` 挂钩/松绳；`X` 切换手动锚；`V` 回自动；`J` 翻正；`H` 开关张力条 + 角度环；`R` 复位。
+2. 控制：`G` 挂钩/松绳（无绳时自动显示最佳锚点）；按住 `F` 收绳；`X` 切换手动锚；`V` 回自动；`J` 翻正；`H` 开关张力条 + 角度环；`R` 复位。按键没反应时先点一下画面，并把输入法切到英文。
 3. 浏览器控制台：
-   - 绞盘试炼：`__superagent.car.place(50, 147, 0)`，按住 F，选锚后按 G。
-   - 弱木桩：按住 F 后 `__superagent.winch.selectAnchor('pad-stump')`，按 G；约 1.5 s 后断。
+   - 绞盘试炼：`__superagent.car.place(50, 147, 0)`，等自动选锚后直接按 G；按住 F 收绳。
+   - 弱木桩：`__superagent.winch.selectAnchor('pad-stump')`，按 G；约 1.5 s 后断。
    - 灌木：`__superagent.winch.selectAnchor('pad-bush')`，按 G。
-   - 跨水：`__superagent.car.place(69, 153, 0.44)`，按住 F，`__superagent.winch.selectAnchor('stream-tree')`，按 G。
+   - 跨水：`__superagent.car.place(69, 153, 0.44)`，`__superagent.winch.selectAnchor('stream-tree')`，按 G；按住 F 收绳。
    - 侧翻：`__superagent.car.rigidBody.setRotation({x:0,y:0,z:0.7071,w:0.7071}, true)`，按住 J 10 s。
    - 断绳/拉不动的故障注入：挂上后 `__superagent.car.rigidBody.setBodyType(1, true)`（固定车身）再按住 F；用完 `setBodyType(0, true)` 恢复。
 4. 单元/集成：`npx vitest run src/tools/winchMath.test.ts src/tools/rope.test.ts src/tools/winch.test.ts`。

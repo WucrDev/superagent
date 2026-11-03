@@ -17,9 +17,9 @@ export interface DrivingInput {
 
 /** W3 winch / righting controls, sampled alongside the driving input. */
 export interface ToolInput {
-  /** Hold to aim; once hooked, hold to reel in. */
+  /** Hold to reel in while a rope is attached; ignored when idle. */
   winchHeld: boolean;
-  /** Edge: hook the highlighted anchor / release the rope. */
+  /** Edge: hook the automatically selected anchor / release the rope. */
   hook: boolean;
   /** Edge: cycle the manual anchor selection. */
   cycle: boolean;
@@ -213,10 +213,10 @@ export class InputManager {
   }
 
   /**
-   * W3 winch controls. Keyboard: F hold aim/reel, G hook/release, X cycle
-   * manual anchor, V auto anchor, J hold righting, H toggle tension HUD.
-   * Gamepad: X aim/reel, B hook/release, D-pad left/right anchor, down righting,
-   * up HUD.
+   * W3 winch controls. Keyboard: G hook/release, F hold reel (only with a rope
+   * attached), X cycle manual anchor, V auto anchor, J hold righting, H toggle
+   * tension HUD. Gamepad: B hook/release, X reel, D-pad left/right anchor, down
+   * righting, up HUD.
    */
   sampleTools(): ToolInput {
     const pad = this.getGamepad();
