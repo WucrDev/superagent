@@ -146,8 +146,14 @@ describe('surface feel', () => {
     simulate(brake, IDLE, 1);
     accelerateTo(brake, 30);
     const brakeStart = brake.car.position.clone();
-    simulate(brake, { ...IDLE, brake: 1 }, 8);
-    const brakeDistance = brake.car.position.z - brakeStart.z;
+    let brakeDistance = 0;
+    for (let i = 0; i < Math.round(8 / STEP); i += 1) {
+      simulate(brake, { ...IDLE, brake: 1 }, STEP);
+      if (brake.car.speedKmh < 0.5) {
+        brakeDistance = brake.car.position.z - brakeStart.z;
+        break;
+      }
+    }
 
     const coast = createRig({ surface });
     simulate(coast, IDLE, 1);
@@ -232,6 +238,22 @@ describe('RaycastVehicle', () => {
     // Chase camera sits behind the car: screen-right is world -X.
     expect(rig.car.position.x).toBeLessThan(beforeX - 0.2);
     expect(rig.car.forward.x).toBeLessThan(-0.05);
+  });
+
+  it('reverses when S is held after stopping', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    accelerateTo(rig, 20);
+    for (let i = 0; i < Math.round(3 / STEP); i += 1) {
+      simulate(rig, { ...IDLE, brake: 1 }, STEP);
+      if (rig.car.speedKmh < 0.5) break;
+    }
+    const stopZ = rig.car.position.z;
+    simulate(rig, { ...IDLE, brake: 1 }, 2);
+    expect(rig.car.displayGear).toBe('R');
+    expect(rig.car.position.z).toBeLessThan(stopZ - 0.2);
+    simulate(rig, IDLE, 0.2);
+    expect(rig.car.displayGear).toBe('L');
   });
 
   it('reset returns the car to the spawn point and clears speed', () => {

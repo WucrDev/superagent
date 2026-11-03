@@ -26,7 +26,7 @@ export class Hud {
 
   update(
     speedKmh: number,
-    gear: Gear,
+    gear: Gear | 'R',
     camera: CameraMode,
     device: InputDevice,
     waterDepth: number,

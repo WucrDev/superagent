@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-DVHgYhrZ.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示/失败态正常，无 console error）
+- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-6oAXVZPm.js`；线上验证 10 个锚点、起手锚点与锚点 C 的 F/G 生效、焦点提示/深水提示/挂钩提示/失败态正常，无 console error）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
 - 交付状态：**PR #43 ready for review（可审）**；worker 的上一轮“制作人检查失败”已记录，本轮已按清单完成实际试玩/操作/失败态自测（见下文“最终自测”）。独立验收卡由编排另行安排，通过后合并；W3 仍未完成独立验收。
 - 结论：**实现与客观自测通过；制作人验收未通过；主观手感、操作可懂度、硬件手柄震动、盲测视频待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
@@ -74,7 +74,7 @@ After（`index-BVFkGArs.js`，启动即显示焦点卡）：![focus after](image
 Before（旧版深水，无 HUD 提示）：![water before](images/w3-anchor-c-after.png)
 After（深水提示 + 锚点 C）：![water after](images/w3-water-hint.png)
 
-**S 刹车/倒挡**：S 刹车实测有效（13.8 → 1.3 km/h）；倒挡当前没有实现（W1 变速箱只有 L/H），属于车辆/变速箱功能，已作为新 ticket 交回评估，不夹带进 W3。深水脱困可先用绞盘或掉头驶出。
+**S 刹车/倒挡**：S 刹车实测有效（14.1 → 1.7 km/h）；停住后继续按住 S 进入倒挡，HUD 显示 R，倒挡限速 15 km/h；深水 (0,200) 实测倒出到 z=189.1，松开 S 回 L。该倒挡按 owner 要求在同一 PR 补齐（自动倒挡；W1 原 L/H 变速箱未新增物理档位）。
 
 线上 `index-BVFkGArs.js` 已验证：焦点卡可见、点击隐藏、失焦重现；深水提示出现；锚点 C 可选中；无 console error。
 
@@ -96,7 +96,7 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 
 线上 `index-WZcO526t.js` 已验证：瞄准/挂钩中/已挂钩三段提示正确，真实挂上 `spawn-tree`，无 console error。**若修完提示后仍觉得三键流程本身别扭，是否简化成“G 直接挂最近锚点”或单键流程，需要 owner 拍板。**
 
-## 最终自测（线上 `index-DVHgYhrZ.js`，2026-11-04）
+## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）
 
 同一 Chrome 156 headless、1280×720、线上 build；按制作人清单实际试玩：
 
@@ -108,10 +108,11 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 | 断绳 | 固定车身故障注入超限，1.2 s 后 `broken`，提示“绳断了：张力超过上限 1.2 s” | `w3-final-rope.png` |
 | 侧翻/翻正 | 侧翻提示“侧翻 · 按住 J 翻正（10 s）”；按住 J 后恢复直立 | `w3-final-rolled.png` / `w3-final-righted.png` |
 | 深水 | 车在 80 cm 深水，HUD“深水 80 cm · 动力 -40% · 尽快驶出（进水后 10 s 恢复）” | `w3-final-water.png` |
+| S 刹车/倒挡 | 14.1 → 1.7 km/h 刹停；继续按住 S 显示 R 并后退（z 153.0→150.4）；深水 (0,200) 倒出到 z=189.1；松开 S 回 L | `w3-final-reverse.png` / `w3-final-reverse-water.png` |
 | 跨水 | 车被拖到 (72.0,159.2)，锚点 C/跨水流程正常 | `w3-final-stream.png` |
 | 控制台 | 无 console error | — |
 
-说明：断绳/拉不动的实机截图仍需固定车身做故障注入（当前地形自然持续陷车不足）；S 无倒挡是另一张卡，不阻塞 W3。
+说明：断绳/拉不动的实机截图仍需固定车身做故障注入；S 倒挡已补（自动倒挡，限速 15 km/h）。
 
 ## 实机候选与张力（当前 PR）
 

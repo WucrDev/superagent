@@ -152,7 +152,7 @@ async function boot(): Promise<void> {
         const water = track.waterAt(position.x, position.z);
         hud.update(
           car.speedKmh,
-          car.gear,
+          car.displayGear,
           cameraRig.mode,
           input.device,
           water?.depth ?? 0,
