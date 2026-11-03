@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-DHKJysoI.js`；线上验证 9 个锚点、选中泥坑树 A、收绳张力 13.7 kN，无 console error）
+- 线上 build：<https://game.xiaoannurse.art/>（同一 `index-DHKJysoI.js`；线上验证 9 个锚点、选中泥坑树 A、HUD 与收绳正常，无 console error）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（42 tests）、`npm run build`
 - 结论：**实现与客观自测通过；主观手感、硬件手柄震动、盲测视频待人工验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
 
