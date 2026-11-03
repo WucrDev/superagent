@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（单键交互 + 倒挡修复版；基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-CQ0lXc9W.js`；单键交互、合并后的倒挡、右下「倒车」按钮和输入诊断均已部署）
+- 线上 build：<https://game.xiaoannurse.art/>（最终 `index-BTjtiWrO.js`；单键交互、倒挡、右下「倒车」按钮、输入诊断与底部控制条均已部署）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（49 tests）、`npm run build`
 - 交付状态：**PR #43 为可审状态（前一轮设置；本轮 agent 未改 PR 状态、未合并、未部署）**。单键交互修复已完成自测；独立验收待安排，通过后才可合并。
 - 结论：**实现与客观自测通过；制作人验收未通过；单键交互与倒挡已通过 headless 预检，主观手感、操作可懂度、飞书焦点/输入法、硬件手柄震动、盲测视频仍待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
@@ -266,10 +266,18 @@ After 同一位置的瞄准状态（H 打开张力条 + 角度环）：![W3 aim]
 - 未在实时玩家路径重放：绳断 / 锚点脱落 / 灌木滑脱（由 `winch.test.ts` 覆盖，W3 既有验收截图见上）；手柄震动、主观手感仍待项目所有者试玩。
 - 结论：**通过（附上述限制）**，可部署主链接；验收证据以本文件 + PR #43 为准。
 
-### 追加：底部控制条 + 键盘焦点恢复（2026-11-04）
+### 追加：倒车按钮 + 底部控制条 + 键盘焦点恢复（2026-11-04）
 
 - 反馈：切到飞书后按 S 无反应；看不到倒挡；控制说明不在玩家预期的位置。
-- 修复：屏幕底部常驻控制条（含 `S 刹车 · 停稳按住 = 倒挡 R` 与 `build <hash>`）；窗口重新获得焦点或标签重新可见时自动隐藏焦点卡，不再要求额外点击。
-- 验收：焦点卡启动可见、失焦出现、聚焦自动隐藏；控制条含倒挡说明；按住 S 进 R 并后退；console error 0。
-- Before（`42adb8c`，无底部控制条）：![controls before](images/w3-controls-before.png)
-- After（本提交，底部控制条 + build hash）：![controls after](images/w3-controls-after.png)
+- 修复（合并远端 `49c0a3f` / `4e6b3ff` 与本轮）：
+  - 右下常驻「倒车」按钮，按住即倒车，不依赖键盘焦点/输入法；
+  - 左上输入诊断显示最后按键/失焦/按钮按住状态；
+  - 底部常驻控制条（含 `S 刹车 · 停稳按住 = 倒挡 R` 与 `build <hash>`）；
+  - 窗口重新获得焦点或标签重新可见时自动隐藏焦点卡。
+- 验收（最终 `index-BTjtiWrO.js`，Chrome 156 headless 1280×720）：
+  - 按 S → 输入诊断 `KeyS`、档位 R、车后退；
+  - 按住右下「倒车」→ 档位 R、车后退；
+  - 焦点卡启动可见、失焦出现、聚焦自动隐藏；控制条与倒车按钮不重叠；console error 0。
+  - `typecheck` / `npm test`（49）/ `build` 全过。
+- Before（`42adb8c`，无底部控制条/倒车按钮）：![controls before](images/w3-controls-before.png)
+- After（最终 build，底部控制条 + build hash + 右下倒车按钮）：![controls after](images/w3-controls-after.png)
