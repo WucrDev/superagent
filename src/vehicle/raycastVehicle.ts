@@ -213,7 +213,7 @@ export class RaycastVehicle {
       state.tire.rotation.y = state.spin;
     }
 
-    this.steeringWheel.rotation.z = this.lastSteer * 1.8;
+    this.steeringWheel.rotation.z = -this.lastSteer * 1.8;
   }
 
   reset(): void {
@@ -289,7 +289,7 @@ export class RaycastVehicle {
       }
     }
 
-    state.steerAngle = config.steer ? input.steer * MAX_STEER : 0;
+    state.steerAngle = config.steer ? -input.steer * MAX_STEER : 0;
 
     if (!Number.isFinite(closestDistance)) {
       state.grounded = false;
