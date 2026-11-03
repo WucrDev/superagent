@@ -1,11 +1,13 @@
-export type Gear = 'L' | 'H';
+export type ForwardGear = 'L' | 'H';
+/** HUD gear including the temporary reverse range. */
+export type Gear = ForwardGear | 'R';
 
-const GEAR_MAX_SPEED: Record<Gear, number> = {
+const GEAR_MAX_SPEED: Record<ForwardGear, number> = {
   L: 9.72, // 35 km/h
   H: 25, // 90 km/h
 };
 
-const GEAR_TORQUE: Record<Gear, number> = {
+const GEAR_TORQUE: Record<ForwardGear, number> = {
   // Low range multiplies torque so it can climb; high range trades torque for top speed.
   L: 1.45,
   H: 0.82,
@@ -16,7 +18,7 @@ const GEAR_TORQUE: Record<Gear, number> = {
  * Surface slip, the clutch and engine audio live in the vehicle/audio modules.
  */
 export class Drivetrain {
-  gear: Gear = 'L';
+  gear: ForwardGear = 'L';
   private shiftTimer = 0;
   readonly shiftDuration = 0.3;
 

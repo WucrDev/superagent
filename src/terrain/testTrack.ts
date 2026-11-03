@@ -119,10 +119,7 @@ export function createTestTrack(scene: THREE.Scene, world: RAPIER.World): Terrai
   });
   addSign(scene, '深水 80cm', -13, 2.4, 200, 0x214e6b);
 
-  // Three winch anchors for W3.
-  addAnchor(scene, world, '锚点 A', 13, 118);
-  addAnchor(scene, world, '锚点 B', -16, 145);
-  addAnchor(scene, world, '锚点 C', 11, 210);
+  // W3 anchors and the winch test pad live in terrain/winchCourse.ts.
 
   return field;
 }
@@ -318,44 +315,6 @@ function addWater(
     level: options.level,
     depth: options.level,
   });
-}
-
-function addAnchor(
-  scene: THREE.Scene,
-  world: RAPIER.World,
-  label: string,
-  x: number,
-  z: number,
-): void {
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32, 0.42, 3.2, 10),
-    new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.95 }),
-  );
-  trunk.position.set(x, 1.6, z);
-  trunk.castShadow = true;
-  scene.add(trunk);
-
-  const canopy = new THREE.Mesh(
-    new THREE.ConeGeometry(1.8, 3.4, 10),
-    new THREE.MeshStandardMaterial({ color: 0x2f5c35, roughness: 0.95 }),
-  );
-  canopy.position.set(x, 4.0, z);
-  canopy.castShadow = true;
-  scene.add(canopy);
-
-  const body = world.createRigidBody(
-    RAPIER.RigidBodyDesc.fixed().setTranslation(x, 1.6, z),
-  );
-  world.createCollider(RAPIER.ColliderDesc.cylinder(1.6, 0.42), body);
-
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.2, 0.06, 8, 32),
-    new THREE.MeshBasicMaterial({ color: 0xf0c35a }),
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.set(x, 0.05, z);
-  scene.add(ring);
-  addSign(scene, label, x - 2.2, 2.0, z, 0xf0c35a);
 }
 
 function addSign(

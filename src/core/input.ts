@@ -15,6 +15,22 @@ export interface DrivingInput {
   camera: boolean;
 }
 
+/** W3 winch / righting controls, sampled alongside the driving input. */
+export interface ToolInput {
+  /** Hold to reel in while a rope is attached; ignored when idle. */
+  winchHeld: boolean;
+  /** Edge: hook the automatically selected anchor / release the rope. */
+  hook: boolean;
+  /** Edge: cycle the manual anchor selection. */
+  cycle: boolean;
+  /** Edge: return to automatic anchor selection. */
+  auto: boolean;
+  /** Held: right the car after a rollover. */
+  right: boolean;
+  /** Edge: toggle the tension bar + angle ring. */
+  hud: boolean;
+}
+
 export type InputDevice = 'keyboard' | 'gamepad' | 'none';
 
 export interface InputSettings {
@@ -36,12 +52,21 @@ const DRIVING_KEYS = new Set([
   'KeyE',
   'KeyC',
   'KeyR',
+  'KeyF',
+  'KeyG',
+  'KeyX',
+  'KeyV',
+  'KeyJ',
+  'KeyH',
   'ArrowUp',
   'ArrowLeft',
   'ArrowDown',
   'ArrowRight',
   'Space',
 ]);
+
+/** Edge-triggered tool keys are latched until the next fixed-step sample. */
+const TOOL_EDGE_KEYS = new Set(['KeyG', 'KeyX', 'KeyV', 'KeyH']);
 
 /**
  * Web equivalent of an input map: keyboard + mouse (right-drag look / wheel
@@ -50,12 +75,18 @@ const DRIVING_KEYS = new Set([
  */
 export class InputManager {
   private readonly keys = new Set<string>();
+  /** Latched one-shot keys so a fast tap between fixed steps is not lost. */
+  private readonly pressed = new Set<string>();
   private settings: InputSettings;
   private lastDevice: InputDevice = 'keyboard';
   private resetHeld = false;
   private shiftUpHeld = false;
   private shiftDownHeld = false;
   private cameraHeld = false;
+  private toolHookHeld = false;
+  private toolCycleHeld = false;
+  private toolAutoHeld = false;
+  private toolHudHeld = false;
   private looking = false;
   private lookDelta: LookDelta = { x: 0, y: 0 };
 
@@ -114,6 +145,20 @@ export class InputManager {
     const keyShiftUp = this.keys.has('KeyE');
     const keyShiftDown = this.keys.has('KeyQ');
     const keyCamera = this.keys.has('KeyC');
+    const keyTool =
+      this.keys.has('KeyF') ||
+      this.keys.has('KeyG') ||
+      this.keys.has('KeyX') ||
+      this.keys.has('KeyV') ||
+      this.keys.has('KeyJ') ||
+      this.keys.has('KeyH');
+    const padTool =
+      (pad ? (pad.buttons[1]?.value ?? 0) > 0.5 : false) ||
+      (pad ? (pad.buttons[2]?.value ?? 0) > 0.5 : false) ||
+      (pad ? (pad.buttons[12]?.value ?? 0) > 0.5 : false) ||
+      (pad ? (pad.buttons[13]?.value ?? 0) > 0.5 : false) ||
+      (pad ? (pad.buttons[14]?.value ?? 0) > 0.5 : false) ||
+      (pad ? (pad.buttons[15]?.value ?? 0) > 0.5 : false);
 
     const gamepadActive =
       padSteer !== 0 ||
@@ -123,7 +168,8 @@ export class InputManager {
       padReset ||
       padShiftUp ||
       padShiftDown ||
-      padCamera;
+      padCamera ||
+      padTool;
     const keyboardActive =
       keyThrottle > 0 ||
       keyBrake > 0 ||
@@ -132,7 +178,8 @@ export class InputManager {
       keyReset ||
       keyShiftUp ||
       keyShiftDown ||
-      keyCamera;
+      keyCamera ||
+      keyTool;
     if (gamepadActive) this.lastDevice = 'gamepad';
     else if (keyboardActive) this.lastDevice = 'keyboard';
 
@@ -165,6 +212,44 @@ export class InputManager {
     return input;
   }
 
+  /**
+   * W3 winch controls. Keyboard: G hook/release, F hold reel (only with a rope
+   * attached), X cycle manual anchor, V auto anchor, J hold righting, H toggle
+   * tension HUD. Gamepad: B hook/release, X reel, D-pad left/right anchor, down
+   * righting, up HUD.
+   */
+  sampleTools(): ToolInput {
+    const pad = this.getGamepad();
+    const padWinch = pad ? (pad.buttons[2]?.value ?? 0) > 0.5 : false;
+    const padHook = pad ? (pad.buttons[1]?.value ?? 0) > 0.5 : false;
+    const padCycle = pad ? (pad.buttons[15]?.value ?? 0) > 0.5 : false;
+    const padAuto = pad ? (pad.buttons[14]?.value ?? 0) > 0.5 : false;
+    const padRight = pad ? (pad.buttons[13]?.value ?? 0) > 0.5 : false;
+    const padHud = pad ? (pad.buttons[12]?.value ?? 0) > 0.5 : false;
+
+    const winchHeld = padWinch || this.keys.has('KeyF');
+    const hookHeld = padHook || this.keys.has('KeyG');
+    const cycleHeld = padCycle || this.keys.has('KeyX');
+    const autoHeld = padAuto || this.keys.has('KeyV');
+    const hudHeld = padHud || this.keys.has('KeyH');
+
+    const input: ToolInput = {
+      winchHeld,
+      hook: (hookHeld && !this.toolHookHeld) || this.pressed.has('KeyG'),
+      cycle: (cycleHeld && !this.toolCycleHeld) || this.pressed.has('KeyX'),
+      auto: (autoHeld && !this.toolAutoHeld) || this.pressed.has('KeyV'),
+      right: padRight || this.keys.has('KeyJ'),
+      hud: (hudHeld && !this.toolHudHeld) || this.pressed.has('KeyH'),
+    };
+
+    for (const code of ['KeyG', 'KeyX', 'KeyV', 'KeyH']) this.pressed.delete(code);
+    this.toolHookHeld = hookHeld;
+    this.toolCycleHeld = cycleHeld;
+    this.toolAutoHeld = autoHeld;
+    this.toolHudHeld = hudHeld;
+    return input;
+  }
+
   /** Mouse look accumulated since the previous render frame (pixels). */
   consumeMouseLook(): LookDelta {
     const delta = this.lookDelta;
@@ -191,11 +276,15 @@ export class InputManager {
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('contextmenu', this.onContextMenu);
     this.keys.clear();
+    this.pressed.clear();
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (DRIVING_KEYS.has(event.code)) {
       event.preventDefault();
+      if (!this.keys.has(event.code) && TOOL_EDGE_KEYS.has(event.code)) {
+        this.pressed.add(event.code);
+      }
       this.keys.add(event.code);
     }
   };
@@ -209,10 +298,15 @@ export class InputManager {
 
   private readonly onBlur = (): void => {
     this.keys.clear();
+    this.pressed.clear();
     this.resetHeld = false;
     this.shiftUpHeld = false;
     this.shiftDownHeld = false;
     this.cameraHeld = false;
+    this.toolHookHeld = false;
+    this.toolCycleHeld = false;
+    this.toolAutoHeld = false;
+    this.toolHudHeld = false;
     this.looking = false;
   };
 

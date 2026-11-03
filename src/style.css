@@ -30,6 +30,10 @@ body {
   height: 100%;
 }
 
+#app canvas:focus {
+  outline: none;
+}
+
 #hud {
   position: fixed;
   top: 20px;
@@ -95,6 +99,80 @@ body {
 
 #hud .meta .sep {
   color: #64705a;
+}
+
+#hud #inputDiag {
+  margin-top: 6px;
+  color: #c9b36a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+#hud #inputDiag.ok {
+  color: #9fe0a0;
+}
+
+#hud #inputDiag.lost {
+  color: #f0a35a;
+}
+
+#hud #water {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(63, 127, 154, 0.24);
+  color: #bfe3ef;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+#hud #water[hidden] {
+  display: none;
+}
+
+#reverseButton {
+  position: fixed;
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border: 1px solid rgba(240, 195, 90, 0.55);
+  border-radius: 50%;
+  background: rgba(10, 14, 10, 0.8);
+  color: #f0c35a;
+  font: 600 14px/1 system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#reverseButton span {
+  color: #9fb18f;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+#reverseButton.active {
+  border-color: #f0c35a;
+  background: rgba(240, 195, 90, 0.9);
+  color: #161a12;
+}
+
+#reverseButton.active span {
+  color: #3a3f2c;
 }
 
 #hud .help {
@@ -198,4 +276,347 @@ body {
 
 #error[hidden] {
   display: none;
+}
+
+/* First-run tutorial: the winch only reacts near an anchor, so the start gate
+   needs a visible prompt pointing at the practice anchor. Hidden by main after
+   the first F press or 12 s. */
+#tutorial {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(560px, calc(100vw - 40px));
+  padding: 10px 16px;
+  border: 1px solid rgba(240, 195, 90, 0.45);
+  border-radius: 10px;
+  background: rgba(10, 14, 10, 0.78);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  color: #dbe6d2;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 300ms ease;
+  backdrop-filter: blur(8px);
+}
+
+#tutorial strong {
+  color: #f0c35a;
+  font-size: 13px;
+}
+
+#tutorial .tutorial-sub {
+  color: #9fb18f;
+  font-size: 11px;
+}
+
+#tutorial.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Full-screen-ish focus card: embedded webviews (Feishu) and background tabs
+   stop delivering keydown events until the game surface is clicked. */
+#focusHint {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: min(440px, calc(100vw - 40px));
+  padding: 16px 22px;
+  border: 1px solid rgba(240, 195, 90, 0.55);
+  border-radius: 12px;
+  background: rgba(10, 14, 10, 0.9);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  color: #dbe6d2;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#focusHint[hidden] {
+  display: none;
+}
+
+#focusHint strong {
+  color: #f0c35a;
+  font-size: 16px;
+}
+
+#focusHint .focus-sub {
+  color: #9fb18f;
+  font-size: 11px;
+}
+
+/* Persistent bottom control legend: keep the key bindings visible where the
+   player looks for them, including the reverse binding. */
+#controlBar {
+  position: fixed;
+  left: 12px;
+  bottom: 6px;
+  z-index: 14;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 3px 12px;
+  max-width: calc(100vw - 130px);
+  padding: 6px 12px;
+  border: 1px solid rgba(220, 235, 210, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 12, 8, 0.78);
+  color: #aebfa4;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(6px);
+}
+
+#controlBar kbd {
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 4px;
+  border: 1px solid rgba(220, 235, 210, 0.22);
+  border-radius: 4px;
+  color: #dbe6d2;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+#controlBar .build-tag {
+  color: #6f8066;
+}
+
+#hud .badge .build-tag {
+  color: #6f8066;
+  font-weight: 400;
+}
+
+/* Phones: the Feishu/webview bottom toolbar can cover fixed controls at the
+   very bottom. Lift the touch controls and the bottom HUD above it, and make
+   the reverse target big enough to hit with a thumb. */
+
+
+/* W3 winch: compact prompt is always available; the full tension bar + angle
+   ring is opt-in with H (immersive default per docs/winch-design.md §6). */
+#winchPrompt {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  z-index: 12;
+  max-width: min(640px, calc(100vw - 40px));
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(10, 14, 10, 0.68);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color: #dbe6d2;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+#winchPrompt[hidden] {
+  display: none;
+}
+
+#winchPrompt.warn {
+  border-color: rgba(240, 195, 90, 0.55);
+  color: #f0d28e;
+}
+
+#winchPrompt.danger {
+  border-color: rgba(255, 85, 68, 0.65);
+  color: #ffb4a2;
+}
+
+#winchHud {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 12;
+  width: 214px;
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(10, 14, 10, 0.64);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  font-size: 11px;
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(10px);
+}
+
+#winchHud[hidden] {
+  display: none;
+}
+
+#winchHud .winch-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#winchHud #winchState {
+  color: #f0c35a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#winchHud #winchAnchor {
+  overflow: hidden;
+  color: #c8d5bd;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#winchHud .winch-tension {
+  height: 8px;
+  margin: 9px 0 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+#winchTensionFill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: #7fb26a;
+  transition: width 60ms linear, background 120ms linear;
+}
+
+#winchTensionFill.warn {
+  background: #e2b34c;
+}
+
+#winchTensionFill.danger {
+  background: #ff5544;
+}
+
+#winchHud .winch-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+  min-height: 15px;
+  color: #9fb18f;
+  font-variant-numeric: tabular-nums;
+}
+
+#winchHud #winchMessage {
+  color: #f0c35a;
+}
+
+#winchHud #winchScore.danger {
+  color: #ffb4a2;
+}
+
+#winchHud #angleRing {
+  display: block;
+  width: 168px;
+  height: 168px;
+  margin: 4px auto 0;
+}
+
+#angleRing .ring-outer,
+#angleRing .ring-inner {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1;
+}
+
+#angleRing .ring-inner {
+  stroke-dasharray: 2 4;
+}
+
+#angleRing .ring-axis {
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+#angleRing .ring-cone {
+  stroke: rgba(240, 195, 90, 0.35);
+  stroke-dasharray: 3 4;
+  stroke-width: 1;
+}
+
+#angleRing .ring-car {
+  fill: #e9f0e4;
+}
+
+#angleRing .ring-line {
+  stroke: rgba(245, 215, 110, 0.65);
+  stroke-width: 1.5;
+}
+
+#angleRing .winch-dot {
+  fill: #8a9a80;
+  stroke: rgba(10, 14, 10, 0.8);
+  stroke-width: 1;
+}
+
+#angleRing .winch-dot.selected {
+  stroke: #f5d76e;
+  stroke-width: 2;
+}
+
+#angleRing .winch-dot.danger {
+  fill: #ff5544;
+  stroke: #ffb4a2;
+}
+
+#winchHud .winch-hint {
+  margin-top: 6px;
+  color: #7e8c73;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Phone layout must come after all base rules so the winch prompt/HUD also clear the bottom toolbar. */
+@media (max-width: 600px) {
+  #reverseButton {
+    width: 88px;
+    height: 88px;
+    right: 14px;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    font-size: 16px;
+  }
+
+  #controlBar {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 130px);
+    font-size: 10px;
+  }
+
+  #winchPrompt {
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #winchHud {
+    right: 14px;
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  }
 }

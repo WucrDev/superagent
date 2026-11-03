@@ -10,7 +10,7 @@
     <div id="app"></div>
 
     <div id="hud" aria-live="polite">
-      <div class="badge">W2 路面与坡度 · three.js + Rapier</div>
+      <div class="badge">W3 绞盘 · three.js + Rapier · <span id="buildTagTop" class="build-tag"></span></div>
       <div class="speed"><span id="speed">0</span><span class="unit">km/h</span></div>
       <div class="meta">
         <span class="gear" id="gear">L</span>
@@ -19,10 +19,66 @@
         <span class="sep">/</span>
         <span id="device">键盘</span>
       </div>
+      <div id="inputDiag">键盘输入：等待按键（按 S 后这里应显示 KeyS）</div>
+      <div id="water" hidden></div>
       <div class="help">
-        WASD 或手柄左摇杆驾驶 · RT/LT 油门/刹车 · Q/E 换档 · C 视角 · Space 手刹 · R 复位<br />
-        右键拖动看 · 滚轮缩放 · Esc 设置
+        WASD 或手柄左摇杆驾驶 · S 刹车（停稳后按住 = 倒挡 R，或按住右下「倒车」）· RT/LT 油门/刹车 · Q/E 换档 · C 视角 · Space 手刹 · R 复位<br />
+        G 挂钩/松绳（自动显示最近锚点）· 按住 F 收绳 · X 换锚 · V 自动锚 · J 翻正 · H 张力条<br />
+        右键拖动看 · 滚轮缩放 · Esc 设置<br />
+        按键没反应？点一下游戏画面，并把输入法切到英文
       </div>
+    </div>
+
+    <div id="winchPrompt" hidden></div>
+
+    <button id="reverseButton" type="button" aria-label="按住倒车">倒车<span>按住</span></button>
+
+    <div id="tutorial">
+      <strong>绞盘练习</strong>
+      <span>G 挂钩（自动显示最近锚点）· 按住 F 收绳 · G 松绳 · X 换锚 · H 张力条</span>
+      <span class="tutorial-sub">起点前方左侧的「起手锚点」会自动选中，按 G 即可</span>
+    </div>
+
+    <div id="focusHint">
+      <strong>点击画面继续</strong>
+      <span>键盘输入需要游戏页面获得焦点；切到飞书或其他窗口后请点回画面。</span>
+      <span class="focus-sub">按键没反应时：先点一下游戏画面，并把输入法切到英文。手机/平板没有物理键盘，请用电脑 Chrome / Safari 打开；或在设置里接手柄。</span>
+    </div>
+
+    <div id="controlBar" aria-label="按键说明">
+      <span><kbd>WASD</kbd> 驾驶</span>
+      <span><kbd>S</kbd> 刹车 · 停稳按住 = 倒挡 R</span>
+      <span><kbd>G</kbd> 挂钩/松绳</span>
+      <span><kbd>F</kbd> 收绳</span>
+      <span><kbd>X</kbd> 换锚</span>
+      <span><kbd>H</kbd> 张力</span>
+      <span id="buildTag" class="build-tag"></span>
+    </div>
+
+    <div id="winchHud" hidden>
+      <div class="winch-head">
+        <span id="winchState">绞盘待机</span>
+        <span id="winchAnchor"></span>
+      </div>
+      <div class="winch-tension" title="张力 / 上限">
+        <div id="winchTensionFill"></div>
+      </div>
+      <div class="winch-meta">
+        <span id="winchScore"></span>
+        <span id="winchMessage"></span>
+      </div>
+      <svg id="angleRing" viewBox="-80 -80 160 160" aria-hidden="true">
+        <circle class="ring-outer" cx="0" cy="0" r="54" />
+        <circle class="ring-inner" cx="0" cy="0" r="26" />
+        <line class="ring-axis" x1="0" y1="-60" x2="0" y2="60" />
+        <line class="ring-axis" x1="-60" y1="0" x2="60" y2="0" />
+        <line class="ring-cone" x1="0" y1="0" x2="-47" y2="-27" />
+        <line class="ring-cone" x1="0" y1="0" x2="47" y2="-27" />
+        <path class="ring-car" d="M 0 -8 L 6 8 L -6 8 Z" />
+        <g id="winchDots"></g>
+        <line id="winchLine" class="ring-line" x1="0" y1="0" x2="0" y2="0" />
+      </svg>
+      <div class="winch-hint">H 隐藏 · G 挂钩/松绳 · 按住 F 收绳 · X 换锚 · V 自动 · J 翻正</div>
     </div>
 
     <div id="settings" hidden>

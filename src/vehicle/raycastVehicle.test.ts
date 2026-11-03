@@ -108,6 +108,18 @@ function simulatePeakY(rig: Rig, input: DrivingInput, seconds: number): number {
   return peak;
 }
 
+/** Hold the brake until the car is effectively stopped; returns elapsed seconds. */
+function simulateUntilStopped(rig: Rig, input: DrivingInput, maxSeconds = 8): number {
+  const steps = Math.round(maxSeconds / STEP);
+  for (let i = 0; i < steps; i += 1) {
+    rig.car.update(STEP, input);
+    rig.world.step();
+    rig.car.sync(STEP);
+    if (rig.car.speedKmh < 0.3) return (i + 1) * STEP;
+  }
+  return maxSeconds;
+}
+
 /** Full throttle until the car reaches `targetKmh`; returns elapsed seconds. */
 function accelerateTo(rig: Rig, targetKmh: number, maxSeconds = 8): number {
   const steps = Math.round(maxSeconds / STEP);
@@ -146,7 +158,9 @@ describe('surface feel', () => {
     simulate(brake, IDLE, 1);
     accelerateTo(brake, 30);
     const brakeStart = brake.car.position.clone();
-    simulate(brake, { ...IDLE, brake: 1 }, 8);
+    // Stop measuring at standstill: holding S after the stop now engages
+    // reverse (R), which would otherwise subtract from the braking distance.
+    simulateUntilStopped(brake, { ...IDLE, brake: 1 });
     const brakeDistance = brake.car.position.z - brakeStart.z;
 
     const coast = createRig({ surface });
@@ -212,6 +226,38 @@ describe('RaycastVehicle', () => {
     expect(rig.car.position.z).toBeGreaterThan(1);
   });
 
+  it('brakes with S while rolling forward and does not engage R', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    accelerateTo(rig, 30);
+    const brakeStart = rig.car.position.clone();
+
+    simulate(rig, { ...IDLE, brake: 1 }, 0.5);
+    expect(rig.car.gear).toBe('L');
+    expect(rig.car.isReversing).toBe(false);
+    expect(rig.car.speedKmh).toBeLessThan(25);
+    expect(rig.car.position.z).toBeGreaterThan(brakeStart.z);
+  });
+
+  it('engages R when S is held at a standstill and caps reverse speed', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    const startZ = rig.car.position.z;
+
+    simulate(rig, { ...IDLE, brake: 1 }, 1);
+    expect(rig.car.gear).toBe('R');
+    expect(rig.car.isReversing).toBe(true);
+    expect(rig.car.position.z).toBeLessThan(startZ - 0.2);
+
+    simulate(rig, { ...IDLE, brake: 1 }, 3);
+    expect(rig.car.speedKmh).toBeGreaterThan(3);
+    expect(rig.car.speedKmh).toBeLessThanOrEqual(12.5);
+
+    simulate(rig, IDLE, 0.2);
+    expect(rig.car.gear).toBe('L');
+    expect(rig.car.isReversing).toBe(false);
+  });
+
   it('shifts from L to H with a power interruption', () => {
     const rig = createRig();
     simulate(rig, IDLE, 1);
@@ -232,6 +278,22 @@ describe('RaycastVehicle', () => {
     // Chase camera sits behind the car: screen-right is world -X.
     expect(rig.car.position.x).toBeLessThan(beforeX - 0.2);
     expect(rig.car.forward.x).toBeLessThan(-0.05);
+  });
+
+  it('reverses when S is held after stopping', () => {
+    const rig = createRig();
+    simulate(rig, IDLE, 1);
+    accelerateTo(rig, 20);
+    for (let i = 0; i < Math.round(3 / STEP); i += 1) {
+      simulate(rig, { ...IDLE, brake: 1 }, STEP);
+      if (rig.car.speedKmh < 0.5) break;
+    }
+    const stopZ = rig.car.position.z;
+    simulate(rig, { ...IDLE, brake: 1 }, 2);
+    expect(rig.car.displayGear).toBe('R');
+    expect(rig.car.position.z).toBeLessThan(stopZ - 0.2);
+    simulate(rig, IDLE, 0.2);
+    expect(rig.car.displayGear).toBe('L');
   });
 
   it('reset returns the car to the spawn point and clears speed', () => {
