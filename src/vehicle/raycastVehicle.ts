@@ -2,6 +2,13 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import type { DrivingInput } from '../core/input';
 import { clamp } from '../core/math';
+import {
+  SURFACES,
+  TerrainField,
+  gripCurve,
+  slopeDegFromNormal,
+  type Surface,
+} from '../terrain/surfaces';
 import { Drivetrain } from './drivetrain';
 
 const CHASSIS_MASS = 1500;
@@ -48,10 +55,25 @@ interface WheelState {
   grounded: boolean;
   contactNormal: THREE.Vector3;
   contactPoint: THREE.Vector3;
+  contactForward: THREE.Vector3;
   steerAngle: number;
   spin: number;
   root: THREE.Group;
   tire: THREE.Mesh;
+  surface: Surface;
+  slipSpeed: number;
+  waterDepth: number;
+}
+
+/** Read-only snapshot used by the effects layer (W2 #7) and debug tooling. */
+export interface WheelContact {
+  grounded: boolean;
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  forward: THREE.Vector3;
+  surface: Surface;
+  slipSpeed: number;
+  waterDepth: number;
 }
 
 /**
@@ -74,11 +96,16 @@ export class RaycastVehicle {
   private forwardSpeed = 0;
   private lastSteer = 0;
   private readonly onShift?: () => void;
+  private waterIngressLevel = 0;
+  private slopeAngle = 0;
+  private maxSlip = 0;
+  private dominantSurface: Surface = SURFACES.dirt;
 
   constructor(
     scene: THREE.Scene,
     private readonly world: RAPIER.World,
     onShift?: () => void,
+    private readonly terrain?: TerrainField,
   ) {
     this.onShift = onShift;
     this.buildExterior();
@@ -135,6 +162,43 @@ export class RaycastVehicle {
     return new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
   }
 
+  /** W2 #7 / issue #13: contact-normal slope under the car, in degrees. */
+  get slopeDeg(): number {
+    return this.slopeAngle;
+  }
+
+  /** W2 #6: largest contact-patch slip speed, used by the effects layer. */
+  get slipSpeed(): number {
+    return this.maxSlip;
+  }
+
+  /** W2 #6: surface under most grounded wheels (for labelling and evidence). */
+  get currentSurface(): Surface {
+    return this.dominantSurface;
+  }
+
+  /** W2 #7: 0..1 engine-ingress level; 1 = full 40 % power loss. */
+  get waterIngress(): number {
+    return this.waterIngressLevel;
+  }
+
+  /** W2 #7: throttle multiplier caused by water ingress (1 = dry). */
+  get powerFactor(): number {
+    return 1 - 0.4 * this.waterIngressLevel;
+  }
+
+  get contacts(): WheelContact[] {
+    return this.wheelStates.map((state) => ({
+      grounded: state.grounded,
+      point: state.contactPoint.clone(),
+      normal: state.contactNormal.clone(),
+      forward: state.contactForward.clone(),
+      surface: state.surface,
+      slipSpeed: state.slipSpeed,
+      waterDepth: state.waterDepth,
+    }));
+  }
+
   setCockpit(active: boolean): void {
     this.cockpit.visible = active;
     this.exterior.visible = !active;
@@ -156,12 +220,33 @@ export class RaycastVehicle {
     const velocity = this.body.linvel();
     const speed = velocity.x * chassisForward.x + velocity.y * chassisForward.y + velocity.z * chassisForward.z;
 
+    // W2 #7 / issue #13: deep water (> 50 cm) floods the intake; power drops
+    // 40 % and recovers over 10 s once the car is back on dry ground.
+    const bodyPosition = this.body.translation();
+    const water = this.terrain?.waterAt(bodyPosition.x, bodyPosition.z) ?? null;
+    const submerged =
+      water !== null &&
+      water.depth > 0.5 &&
+      bodyPosition.y - CHASSIS_HALF_HEIGHT < water.level + 0.02;
+    this.waterIngressLevel = submerged
+      ? Math.min(1, this.waterIngressLevel + dt / 1.5)
+      : Math.max(0, this.waterIngressLevel - dt / 10);
+    if (water && water.depth > 0.05) {
+      const drag = (submerged ? 0.35 : 0.08) * (water.depth / 0.8);
+      const dragScale = CHASSIS_MASS * drag * dt;
+      this.body.applyImpulse(
+        { x: -velocity.x * dragScale, y: 0, z: -velocity.z * dragScale },
+        true,
+      );
+    }
+
     const gearMax = this.drivetrain.maxSpeed;
     const torqueFactor = this.drivetrain.shifting ? 0 : this.drivetrain.torqueFactor;
     const engineForce =
       input.throttle *
       ENGINE_FORCE *
       torqueFactor *
+      (1 - 0.4 * this.waterIngressLevel) *
       clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
     const perWheelDrive = engineForce / DRIVEN_WHEELS;
     const perWheelBrake = (input.brake * BRAKE_FORCE) / WHEELS.length;
@@ -181,6 +266,8 @@ export class RaycastVehicle {
         handbrakeForce,
       );
     }
+
+    this.updateContactSummary();
 
     const angular = this.body.angvel();
     this.body.applyTorqueImpulse(
@@ -224,13 +311,31 @@ export class RaycastVehicle {
     this.drivetrain.reset();
     this.forwardSpeed = 0;
     this.lastSteer = 0;
+    this.waterIngressLevel = 0;
+    this.slopeAngle = 0;
+    this.maxSlip = 0;
+    this.dominantSurface = SURFACES.dirt;
     for (const state of this.wheelStates) {
       state.compression = 0;
       state.length = SUSPENSION_REST;
       state.grounded = false;
       state.spin = 0;
       state.steerAngle = 0;
+      state.slipSpeed = 0;
+      state.waterDepth = 0;
+      state.surface = SURFACES.dirt;
     }
+    this.sync(0);
+  }
+
+  /** Debug/test helper: move the car to a known pose without a reset delay. */
+  place(x: number, z: number, yaw = 0): void {
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    this.body.setTranslation({ x, y: 1.4, z }, true);
+    this.body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.forwardSpeed = 0;
     this.sync(0);
   }
 
@@ -258,7 +363,7 @@ export class RaycastVehicle {
     let closestDistance = Number.POSITIVE_INFINITY;
     let closestNormal = up.clone();
     let closestPoint = new THREE.Vector3();
-    let surfaceFriction = 1.0;
+    let surface = SURFACES.dirt;
 
     for (let ray = 0; ray < RAYS_PER_WHEEL; ray += 1) {
       const angle = (ray / RAYS_PER_WHEEL) * Math.PI * 2;
@@ -285,7 +390,7 @@ export class RaycastVehicle {
         closestDistance = hit.timeOfImpact;
         closestNormal = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
         closestPoint = origin.addScaledVector(direction, hit.timeOfImpact);
-        surfaceFriction = clamp(hit.collider.friction(), 0.05, 1.2);
+        surface = this.terrain?.surfaceAt(hit.collider.handle) ?? SURFACES.dirt;
       }
     }
 
@@ -299,6 +404,9 @@ export class RaycastVehicle {
       state.contactPoint
         .copy(anchor)
         .addScaledVector(direction, SUSPENSION_REST + WHEEL_RADIUS);
+      state.slipSpeed = 0;
+      state.waterDepth = 0;
+      state.surface = SURFACES.dirt;
       return;
     }
 
@@ -313,6 +421,7 @@ export class RaycastVehicle {
     const normal = closestNormal.normalize();
     state.contactNormal.copy(normal);
     state.contactPoint.copy(closestPoint);
+    state.surface = surface;
 
     const contactVelocity = this.body.velocityAtPoint({
       x: closestPoint.x,
@@ -349,12 +458,14 @@ export class RaycastVehicle {
       contactVelocity.y * wheelRight.y +
       contactVelocity.z * wheelRight.z;
 
-    const maxFrictionImpulse = surfaceFriction * Math.max(springForce, 300) * dt;
+    const contactSlip = Math.hypot(longSpeed, latSpeed);
+    const maxFrictionImpulse =
+      surface.friction * gripCurve(contactSlip) * Math.max(springForce, 300) * dt;
     let longitudinal = config.drive ? driveForce : 0;
     const gravityAlong = -9.81 * wheelForward.y;
 
     // Rolling resistance / engine braking keeps the car from free-rolling.
-    longitudinal -= longSpeed * 30;
+    longitudinal -= longSpeed * 30 * surface.rollingResistance;
 
     if (brakeForce > 0) {
       if (longSpeed > 0.2) longitudinal -= brakeForce;
@@ -390,7 +501,7 @@ export class RaycastVehicle {
     );
 
     const lateralImpulse = clamp(
-      -latSpeed * (CHASSIS_MASS / 4) * LATERAL_GRIP * dt,
+      -latSpeed * (CHASSIS_MASS / 4) * LATERAL_GRIP * surface.lateralGrip * dt,
       -maxFrictionImpulse,
       maxFrictionImpulse,
     );
@@ -403,6 +514,38 @@ export class RaycastVehicle {
       { x: closestPoint.x, y: closestPoint.y, z: closestPoint.z },
       true,
     );
+
+    state.contactForward.copy(wheelForward);
+    state.slipSpeed = contactSlip;
+    state.waterDepth = this.terrain?.waterDepthAt(closestPoint.x, closestPoint.z) ?? 0;
+  }
+
+  /** W2 #6/#7: combine the four wheel contacts into car-level state. */
+  private updateContactSummary(): void {
+    let groundedCount = 0;
+    let normalY = 0;
+    let maxSlip = 0;
+    const counts = new Map<Surface, number>();
+    for (const state of this.wheelStates) {
+      if (!state.grounded) continue;
+      groundedCount += 1;
+      normalY += state.contactNormal.y;
+      maxSlip = Math.max(maxSlip, state.slipSpeed);
+      counts.set(state.surface, (counts.get(state.surface) ?? 0) + 1);
+    }
+    this.slopeAngle =
+      groundedCount > 0 ? slopeDegFromNormal(normalY / groundedCount) : 0;
+    this.maxSlip = maxSlip;
+
+    let dominant = SURFACES.dirt;
+    let dominantCount = 0;
+    for (const [surface, count] of counts) {
+      if (count > dominantCount) {
+        dominant = surface;
+        dominantCount = count;
+      }
+    }
+    this.dominantSurface = dominant;
   }
 
   private buildExterior(): void {
@@ -454,10 +597,14 @@ export class RaycastVehicle {
         grounded: false,
         contactNormal: new THREE.Vector3(0, 1, 0),
         contactPoint: new THREE.Vector3(),
+        contactForward: new THREE.Vector3(0, 0, 1),
         steerAngle: 0,
         spin: 0,
         root,
         tire,
+        surface: SURFACES.dirt,
+        slipSpeed: 0,
+        waterDepth: 0,
       });
     }
   }

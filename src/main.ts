@@ -2,6 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import './style.css';
 import { EngineAudio } from './core/audio';
+import { SurfaceEffects } from './core/effects';
 import { InputManager } from './core/input';
 import { GameLoop } from './core/loop';
 import { createRenderer } from './core/renderer';
@@ -65,14 +66,15 @@ async function boot(): Promise<void> {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     world.timestep = FIXED_STEP;
 
-    createTestTrack(scene, world);
+    const track = createTestTrack(scene, world);
 
     const audio = new EngineAudio();
     const startAudio = (): void => audio.start();
     window.addEventListener('keydown', startAudio, { once: true });
     window.addEventListener('pointerdown', startAudio, { once: true });
 
-    const car = new RaycastVehicle(scene, world, () => audio.shift());
+    const car = new RaycastVehicle(scene, world, () => audio.shift(), track);
+    const effects = new SurfaceEffects(scene);
     const input = new InputManager({ deadzone: 0.15, steerSensitivity: 1 });
     const cameraRig = new CameraRig(camera, car);
     new SettingsPanel(input, cameraRig);
@@ -98,6 +100,7 @@ async function boot(): Promise<void> {
         sun.target.updateMatrixWorld();
 
         cameraRig.update(frameTime, input);
+        effects.update(frameTime, car);
         hud.update(car.speedKmh, car.gear, cameraRig.mode, input.device);
         audio.update(car.speedKmh, lastThrottle, car.gear);
         renderer.render(scene, camera);
