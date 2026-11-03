@@ -31,6 +31,14 @@ export function createWinchCourse(
 ): WinchAnchor[] {
   const anchors: WinchAnchor[] = [];
 
+  // A practice anchor within 12 m of the spawn: the winch only reacts when an
+  // anchor is in range, so without this the first F/G press at the start gate
+  // looks like a dead key. The sign and the tutorial banner point at it.
+  anchors.push(
+    createTree(scene, world, 'spawn-tree', '起手锚点（练习）', 3.5, 9),
+  );
+  addSign(scene, '起手绞盘 F / G', 0, 2.2, 13, 0xf0c35a);
+
   // Original W1 anchors (three trees) are now real, selectable W3 anchors.
   anchors.push(createTree(scene, world, 'anchor-a', '锚点 A', 13, 118));
   anchors.push(createTree(scene, world, 'anchor-b', '锚点 B', -16, 145));

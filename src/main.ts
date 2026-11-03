@@ -97,11 +97,21 @@ async function boot(): Promise<void> {
 
     let lastThrottle = 0;
 
+    const tutorial = document.querySelector<HTMLElement>('#tutorial');
+    let tutorialHidden = false;
+    const hideTutorial = (): void => {
+      if (tutorialHidden) return;
+      tutorialHidden = true;
+      tutorial?.classList.add('hidden');
+    };
+    window.setTimeout(hideTutorial, 12000);
+
     const loop = new GameLoop(FIXED_STEP, {
       update: (step) => {
         const sample = input.sample();
         const tools = input.sampleTools();
         lastThrottle = sample.throttle;
+        if (tools.winchHeld) hideTutorial();
         if (tools.hud) winchHud.toggle();
         if (sample.reset) {
           car.reset();

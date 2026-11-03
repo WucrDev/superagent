@@ -200,6 +200,49 @@ body {
   display: none;
 }
 
+/* First-run tutorial: the winch only reacts near an anchor, so the start gate
+   needs a visible prompt pointing at the practice anchor. Hidden by main after
+   the first F press or 12 s. */
+#tutorial {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(560px, calc(100vw - 40px));
+  padding: 10px 16px;
+  border: 1px solid rgba(240, 195, 90, 0.45);
+  border-radius: 10px;
+  background: rgba(10, 14, 10, 0.78);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  color: #dbe6d2;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 300ms ease;
+  backdrop-filter: blur(8px);
+}
+
+#tutorial strong {
+  color: #f0c35a;
+  font-size: 13px;
+}
+
+#tutorial .tutorial-sub {
+  color: #9fb18f;
+  font-size: 11px;
+}
+
+#tutorial.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
 /* W3 winch: compact prompt is always available; the full tension bar + angle
    ring is opt-in with H (immersive default per docs/winch-design.md §6). */
 #winchPrompt {
