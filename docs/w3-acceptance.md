@@ -3,7 +3,7 @@
 - 日期：2026-11-04
 - 构建：W3 绞盘 PR HEAD（单键交互 + 倒挡修复版；基于 `main` 8e18123）
 - 测试环境：macOS + Chrome 156 headless（SwiftShader，1280×720）；物理为 Rapier，固定步长 60 Hz
-- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-CaUX03sE.js`；单键交互、合并后的倒挡和右下「倒车」按钮均已部署）
+- 线上 build：<https://game.xiaoannurse.art/>（线上为 `index-CQ0lXc9W.js`；单键交互、合并后的倒挡、右下「倒车」按钮和输入诊断均已部署）
 - 自测命令：`npm ci`、`npm run typecheck`、`npm test`（49 tests）、`npm run build`
 - 交付状态：**PR #43 为可审状态（前一轮设置；本轮 agent 未改 PR 状态、未合并、未部署）**。单键交互修复已完成自测；独立验收待安排，通过后才可合并。
 - 结论：**实现与客观自测通过；制作人验收未通过；单键交互与倒挡已通过 headless 预检，主观手感、操作可懂度、飞书焦点/输入法、硬件手柄震动、盲测视频仍待人工/独立验收**。失败态中“拉不动/绳断”的截图使用固定车身做故障注入，原因见“已知限制”。
@@ -167,6 +167,8 @@ After 已挂钩：![prompt attached](images/w3-prompt-attached.png)
 - owner 的浏览器/飞书环境里 S 不进游戏（焦点被飞书/输入法/其他窗口拿走）；此前的验收文档已明确“飞书内嵌 webview 键盘焦点与中文输入法无法在 headless 复现”，真实输入路径没有通过验收，却把自动化结果当成可用，属于半成品交付。
 - 修复：加右下角「倒车」按住按钮（`#reverseButton`），pointer 按住时直接给 brake=1，绕过键盘/输入法；HUD 同步显示 `R`。线上实测按住按钮 0.5 s → `R`，z 146.97→145.76；松开回 `L`；无 console error。帮助补“或按住右下「倒车」”，并保留焦点卡/切英文输入法提示。
 - 按钮截图：`w3-final-reverse-button.png`。
+- HUD 输入诊断（左上速度下方 `#inputDiag`）：按 S 时显示“最后按键：KeyS · x s 前”；页面失焦显示“页面失焦 · 点一下游戏画面”；按住右下按钮显示“屏幕倒车按钮：按住中”；无输入时显示等待提示。owner 可据此区分“按键没进页面”与“逻辑没接合”。
+- 线上实测：按 S → “最后按键：KeyS · 0.7 s 前”、gear R；失焦 → “页面失焦”；按住按钮 → “屏幕倒车按钮：按住中”、gear R、车后退；无 console error。截图：`w3-input-diag-keyboard.png` / `w3-input-diag-button.png`。
 - 真实路径（含按钮）仍待制作人/独立验收；不再宣称已验收。
 
 ## 最终自测（线上 `index-6oAXVZPm.js`，2026-11-04）

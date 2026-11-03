@@ -101,6 +101,23 @@ body {
   color: #64705a;
 }
 
+#hud #inputDiag {
+  margin-top: 6px;
+  color: #c9b36a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+#hud #inputDiag.ok {
+  color: #9fe0a0;
+}
+
+#hud #inputDiag.lost {
+  color: #f0a35a;
+}
+
 #hud #water {
   margin-top: 8px;
   padding: 5px 8px;

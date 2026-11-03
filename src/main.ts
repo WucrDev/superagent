@@ -118,9 +118,27 @@ async function boot(): Promise<void> {
     };
     // The card is visible at boot; the first click/key hides it. A blur (e.g.
     // switching to Feishu) brings it back with the keyboard-paused explanation.
-    window.addEventListener('blur', () => setFocusHint(true));
-    window.addEventListener('pointerdown', () => setFocusHint(false));
-    window.addEventListener('keydown', () => setFocusHint(false));
+    let pageFocused = document.hasFocus();
+    let lastKeyLabel = '';
+    let lastKeyAt = 0;
+    window.addEventListener('blur', () => {
+      pageFocused = false;
+      setFocusHint(true);
+    });
+    window.addEventListener('focus', () => {
+      pageFocused = true;
+    });
+    window.addEventListener('pointerdown', () => {
+      pageFocused = true;
+      setFocusHint(false);
+    });
+    window.addEventListener('keydown', (event) => {
+      pageFocused = true;
+      lastKeyLabel = event.code || event.key || '?';
+      lastKeyAt = performance.now();
+      setFocusHint(false);
+    });
+    const inputDiag = document.querySelector<HTMLElement>('#inputDiag');
 
     // On-screen reverse: a held pointer is a held brake, so the normal
     // standstill->R logic applies even when the browser/IME eats keydown.
@@ -177,6 +195,24 @@ async function boot(): Promise<void> {
           water?.depth ?? 0,
         );
         audio.update(car.speedKmh, lastThrottle, car.gear);
+        if (inputDiag) {
+          const now = performance.now();
+          let diag = '键盘输入：等待按键（按 S 后这里应显示 KeyS）';
+          let tone = '';
+          if (reverseHeld) {
+            diag = '屏幕倒车按钮：按住中（松开停）';
+            tone = 'ok';
+          } else if (!pageFocused) {
+            diag = '页面失焦 · 点一下游戏画面';
+            tone = 'lost';
+          } else if (lastKeyAt > 0 && now - lastKeyAt < 3000) {
+            diag = `最后按键：${lastKeyLabel} · ${((now - lastKeyAt) / 1000).toFixed(1)} s 前`;
+            tone = 'ok';
+          }
+          inputDiag.textContent = diag;
+          inputDiag.classList.toggle('ok', tone === 'ok');
+          inputDiag.classList.toggle('lost', tone === 'lost');
+        }
         renderer.render(scene, camera);
       },
     });
