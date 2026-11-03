@@ -108,6 +108,93 @@ function simulatePeakY(rig: Rig, input: DrivingInput, seconds: number): number {
   return peak;
 }
 
+/** Full throttle until the car reaches `targetKmh`; returns elapsed seconds. */
+function accelerateTo(rig: Rig, targetKmh: number, maxSeconds = 8): number {
+  const steps = Math.round(maxSeconds / STEP);
+  for (let i = 0; i < steps; i += 1) {
+    rig.car.update(STEP, { ...IDLE, throttle: 1 });
+    rig.world.step();
+    rig.car.sync(STEP);
+    if (rig.car.speedKmh >= targetKmh) return (i + 1) * STEP;
+  }
+  return maxSeconds;
+}
+
+/**
+ * W2 surface-feel tuning: the four materials must be distinguishable while
+ * driving the test-track lanes, not only when braking or climbing. These
+ * thresholds encode the intended character:
+ *   rock  - planted and a little quicker than dirt (best grip, least drag);
+ *   mud   - sluggish launch, long brake, wide turn, quick coast-down;
+ *   snow  - floaty: ~2.8x the launch time and brake distance of dirt, and a
+ *           much wider turn.
+ */
+describe('surface feel', () => {
+  interface Feel {
+    launchTime: number;
+    brakeDistance: number;
+    coastDrop: number;
+    turnLateral: number;
+  }
+
+  const feelOf = (surface: Surface): Feel => {
+    const launch = createRig({ surface });
+    simulate(launch, IDLE, 1);
+    const launchTime = accelerateTo(launch, 30);
+
+    const brake = createRig({ surface });
+    simulate(brake, IDLE, 1);
+    accelerateTo(brake, 30);
+    const brakeStart = brake.car.position.clone();
+    simulate(brake, { ...IDLE, brake: 1 }, 8);
+    const brakeDistance = brake.car.position.z - brakeStart.z;
+
+    const coast = createRig({ surface });
+    simulate(coast, IDLE, 1);
+    accelerateTo(coast, 30);
+    const coastFrom = coast.car.speedKmh;
+    simulate(coast, IDLE, 2);
+    const coastDrop = coastFrom - coast.car.speedKmh;
+
+    const turn = createRig({ surface });
+    simulate(turn, IDLE, 1);
+    accelerateTo(turn, 30);
+    const turnStart = turn.car.position.clone();
+    simulate(turn, { ...IDLE, throttle: 1, steer: 1 }, 1);
+    const turnLateral = Math.abs(turn.car.position.x - turnStart.x);
+
+    return { launchTime, brakeDistance, coastDrop, turnLateral };
+  };
+
+  it('separates the four materials on launch, braking, coasting and steering', () => {
+    const dirt = feelOf(SURFACES.dirt);
+    const rock = feelOf(SURFACES.rock);
+    const mud = feelOf(SURFACES.mud);
+    const snow = feelOf(SURFACES.snow);
+
+    // Launch (0-30 km/h): snow is dramatically slower, mud clearly slower,
+    // rock at least as quick as the dirt baseline.
+    expect(snow.launchTime).toBeGreaterThan(dirt.launchTime * 2.4);
+    expect(mud.launchTime).toBeGreaterThan(dirt.launchTime * 1.4);
+    expect(rock.launchTime).toBeLessThanOrEqual(dirt.launchTime * 1.05);
+
+    // Braking from 30 km/h: snow needs >2.4x dirt, mud >1.5x, rock <= dirt.
+    expect(snow.brakeDistance).toBeGreaterThan(dirt.brakeDistance * 2.4);
+    expect(mud.brakeDistance).toBeGreaterThan(dirt.brakeDistance * 1.5);
+    expect(rock.brakeDistance).toBeLessThanOrEqual(dirt.brakeDistance * 1.1);
+
+    // Coasting from 30 km/h: loose surfaces drag the car down fast.
+    expect(mud.coastDrop).toBeGreaterThan(dirt.coastDrop * 1.5);
+    expect(snow.coastDrop).toBeGreaterThan(dirt.coastDrop * 1.6);
+    expect(rock.coastDrop).toBeLessThanOrEqual(dirt.coastDrop);
+
+    // Steering at 30 km/h: snow understeers hard, mud runs wide, rock bites.
+    expect(snow.turnLateral).toBeLessThan(dirt.turnLateral * 0.55);
+    expect(mud.turnLateral).toBeLessThan(dirt.turnLateral * 0.75);
+    expect(rock.turnLateral).toBeGreaterThanOrEqual(dirt.turnLateral * 0.95);
+  });
+});
+
 beforeAll(async () => {
   await RAPIER.init();
 });

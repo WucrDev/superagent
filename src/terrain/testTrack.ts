@@ -96,11 +96,14 @@ export function createTestTrack(scene: THREE.Scene, world: RAPIER.World): Terrai
     ...SURFACES.wetMud,
   });
 
-  // W2 #12: four material lanes for back-to-back feel tests.
-  addSurfaceLane(scene, world, field, '干土（基线）', 40, 80, SURFACES.dirt, 0x5f6b47);
-  addSurfaceLane(scene, world, field, '泥地', 54, 80, SURFACES.mud, 0x4a3420);
-  addSurfaceLane(scene, world, field, '岩石', 68, 80, SURFACES.rock, 0x7c7c74);
-  addSurfaceLane(scene, world, field, '雪地', 82, 80, SURFACES.snow, 0xe8eef4);
+  // W2 #12: four material lanes for back-to-back feel tests. The lanes start
+  // at z = 54 (centre 78, 48 m long) so a standing start at z = 55 is already
+  // on the tested material; the previous 62 m start put the first 7 m on dry
+  // dirt and hid most of the launch difference.
+  addSurfaceLane(scene, world, field, '干土（基线）', 40, 78, SURFACES.dirt, 0x5f6b47);
+  addSurfaceLane(scene, world, field, '泥地', 54, 78, SURFACES.mud, 0x4a3420);
+  addSurfaceLane(scene, world, field, '岩石', 68, 78, SURFACES.rock, 0x7c7c74);
+  addSurfaceLane(scene, world, field, '雪地', 82, 78, SURFACES.snow, 0xe8eef4);
 
   // 2 m ditch across the middle of the track.
   addSign(scene, '2m 沟', -13, 2.4, DITCH_Z, 0xc9a227);
@@ -257,7 +260,7 @@ function addSurfaceLane(
   color: number,
 ): void {
   addStaticBox(scene, world, field, {
-    size: [10, 0.08, 36],
+    size: [10, 0.08, 48],
     position: [x, 0.04, z],
     color,
     friction: surface.friction,
