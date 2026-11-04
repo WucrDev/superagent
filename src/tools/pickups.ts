@@ -26,11 +26,18 @@ export interface PickupResult {
   total: number;
 }
 
-/** Default supply crates: one near the start, one at the 2 m ditch, one at the winch pad. */
+/**
+ * Default supply crates: one near the start, one at the far 2 m ditch, one at
+ * the winch pad, plus the W4 rework pad east of spawn (plank + repair at the
+ * entrance, another repair south of the crash block for the +35 check).
+ */
 export const DEFAULT_PICKUPS: readonly PickupSpec[] = [
   { kind: 'repair', x: -4.5, z: 14 },
   { kind: 'plank', x: -6.5, z: 169.5 },
   { kind: 'repair', x: 56, z: 146 },
+  { kind: 'plank', x: 20, z: 21.5 },
+  { kind: 'repair', x: 25, z: 17 },
+  { kind: 'repair', x: 56, z: 16 },
 ];
 
 const PICKUP_RADIUS = 2.8;

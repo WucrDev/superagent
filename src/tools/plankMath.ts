@@ -11,8 +11,13 @@ import { clamp } from '../core/math';
 export const PLANK = {
   /** Board length along the driving direction (m). */
   length: 4,
-  /** Board width (m). */
-  width: 0.9,
+  /**
+   * Board width (m). The vehicle track is 1.72 m; the original 0.9 m board was
+   * narrower than the wheelbase, so both wheel lines straddled it and the car
+   * bridged the 2 m ditch with its chassis instead of driving on the plank
+   * (confirmed on the from-spawn W4 pad, which took chassis damage mid-cross).
+   */
+  width: 2.0,
   /** Board thickness (m). */
   thickness: 0.12,
   /** Distance from the car centre to the board centre (m). */

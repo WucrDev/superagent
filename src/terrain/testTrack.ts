@@ -7,6 +7,28 @@ const DITCH_Z = 175;
 const DITCH_HALF_WIDTH = 25;
 const DITCH_HALF_LENGTH = 1;
 
+/**
+ * W4 rework: a compact, signposted tool-test pad just east of the spawn.
+ *
+ * The old W4 self-test dropped the car at the far 2 m ditch with `car.place`.
+ * A real player driving from spawn hit the rock pile, then the 30° / 35° mud
+ * slopes, lost all health and was pushed outside the ditch. This pad puts a
+ * second 2 m ditch, a single-wheel rollover ramp, a low-speed crash block and
+ * supply crates within ~60 m of spawn, on flat ground with no obstacles before
+ * it. The W1/W2/W3 coordinates, slopes and anchors are unchanged; only the
+ * east ground slab is split around the new ditch.
+ */
+const W4_DITCH_X = 33;
+const W4_DITCH_HALF_WIDTH = 1;
+const W4_DITCH_Z = 25;
+const W4_DITCH_HALF_LENGTH = 10;
+
+const W4_RAMP_CENTER_X = 50;
+const W4_RAMP_CENTER_Z = 25.2;
+const W4_RAMP_LENGTH = 7;
+const W4_RAMP_WIDTH = 1.6;
+const W4_RAMP_ANGLE = 0.35;
+
 interface StaticBoxOptions {
   size: [number, number, number];
   position: [number, number, number];
@@ -34,6 +56,7 @@ export function createTestTrack(scene: THREE.Scene, world: RAPIER.World): Terrai
 
   buildGround(scene, world, field);
   buildStartGate(scene, world);
+  buildW4Pad(scene, world, field);
 
   // Gentle 8° hill with a flat top and a matching descent.
   box({
@@ -137,12 +160,44 @@ function buildGround(scene: THREE.Scene, world: RAPIER.World, field: TerrainFiel
     friction: 1,
     surface: dirt,
   });
+  // The east slab carries the W4 pad, so split it around that 2 m ditch. The
+  // rest of the W1/W2/W3 layout keeps exactly the same colliders as before.
+  const w4West = W4_DITCH_X - W4_DITCH_HALF_WIDTH;
+  const w4East = W4_DITCH_X + W4_DITCH_HALF_WIDTH;
   ground({
-    size: [375, thickness, GROUND_SIZE],
-    position: [DITCH_HALF_WIDTH + 375 / 2, y, 0],
+    size: [w4West - DITCH_HALF_WIDTH, thickness, GROUND_SIZE],
+    position: [(DITCH_HALF_WIDTH + w4West) / 2, y, 0],
     color: 0x46543a,
     friction: 1,
     surface: dirt,
+  });
+  ground({
+    size: [400 - w4East, thickness, GROUND_SIZE],
+    position: [(w4East + 400) / 2, y, 0],
+    color: 0x46543a,
+    friction: 1,
+    surface: dirt,
+  });
+  ground({
+    size: [W4_DITCH_HALF_WIDTH * 2, thickness, 400 + W4_DITCH_Z - W4_DITCH_HALF_LENGTH],
+    position: [W4_DITCH_X, y, (-400 + W4_DITCH_Z - W4_DITCH_HALF_LENGTH) / 2],
+    color: 0x46543a,
+    friction: 1,
+    surface: dirt,
+  });
+  ground({
+    size: [W4_DITCH_HALF_WIDTH * 2, thickness, 400 - W4_DITCH_Z - W4_DITCH_HALF_LENGTH],
+    position: [W4_DITCH_X, y, (400 + W4_DITCH_Z + W4_DITCH_HALF_LENGTH) / 2],
+    color: 0x46543a,
+    friction: 1,
+    surface: dirt,
+  });
+  ground({
+    size: [W4_DITCH_HALF_WIDTH * 2, 0.5, W4_DITCH_HALF_LENGTH * 2],
+    position: [W4_DITCH_X, -2.25, W4_DITCH_Z],
+    color: 0x2a2a24,
+    friction: 0.9,
+    surface: SURFACES.mud,
   });
   ground({
     size: [DITCH_HALF_WIDTH * 2, thickness, 400 + DITCH_Z - DITCH_HALF_LENGTH],
@@ -194,6 +249,178 @@ function buildStartGate(scene: THREE.Scene, world: RAPIER.World): void {
   banner.position.set(0, 3.35, 5);
   banner.castShadow = true;
   scene.add(banner);
+}
+
+/**
+ * W4 rework: compact tool-test pad east of the spawn.
+ *
+ * Layout, all on flat dirt with no obstacles on the approach:
+ *  - dashed lane + signs point east from the start gate;
+ *  - a 20 m-long 2 m ditch at x=33 with a painted stop box;
+ *  - a single-wheel rollover ramp at x≈50 that tips the car onto its side;
+ *  - a low-speed crash block at x=60 and a repair-crate station south of it.
+ * Supplies and the crash block are signposted so this path needs no debug
+ * commands; `car.place` is only used while tuning the pad.
+ */
+function buildW4Pad(scene: THREE.Scene, world: RAPIER.World, field: TerrainField): void {
+  const box = (options: StaticBoxOptions): void => addStaticBox(scene, world, field, options);
+
+  addSign(
+    scene,
+    'W4 工具试炼 → 出闸左转 35 m',
+    -10.5,
+    3.0,
+    9.5,
+    0xf0c35a,
+    Math.PI,
+    3.2,
+  );
+  addSign(
+    scene,
+    'W4 试炼场 · 补给驶过拾取 · 1–4/T',
+    26,
+    2.6,
+    33,
+    0xf0c35a,
+    -Math.PI / 2,
+    2.6,
+  );
+
+  // Dashed lead-in on the flat ground, plus a painted stop box. The plank is
+  // 4 m long and is placed 4.4 m ahead, so the car centre must stop between
+  // x=27.6 and x=29.6 for both board ends to find ground on either bank.
+  for (const x of [12, 16.5, 21, 25.5]) {
+    addGroundMark(scene, 2.2, 0.28, x, W4_DITCH_Z, 0xf0c35a);
+  }
+  addGroundMark(scene, 2.0, 16.0, 28.6, W4_DITCH_Z, 0x8a7a55);
+  addGroundMark(scene, 0.45, 16.0, 27.7, W4_DITCH_Z, 0xf0c35a);
+  addGroundMark(scene, 0.45, 16.0, 29.7, W4_DITCH_Z, 0xf0c35a);
+
+  addSign(
+    scene,
+    '2m 沟 · 停进黄框 · 2 选木板 · G 架桥',
+    28.4,
+    2.7,
+    18.2,
+    0xc9a227,
+    -Math.PI / 2,
+    2.6,
+  );
+  addSign(
+    scene,
+    '过沟直行 → 侧翻坡',
+    36.6,
+    2.6,
+    19.8,
+    0xc9a227,
+    -Math.PI / 2,
+    2.6,
+  );
+  addSign(
+    scene,
+    '侧翻测试 · 左轮上坡',
+    44.5,
+    2.5,
+    30.5,
+    0xf0c35a,
+    -Math.PI / 2,
+    2.6,
+  );
+  addSign(
+    scene,
+    '撞击墩 · 低速撞一下',
+    55.2,
+    2.4,
+    16.5,
+    0xc94f5a,
+    -Math.PI / 2,
+    2.6,
+  );
+  addSign(
+    scene,
+    '维修包补给 · 停稳按住 G 2 s',
+    60,
+    2.4,
+    14.5,
+    0xc94f5a,
+    -Math.PI / 2,
+    2.6,
+  );
+
+  // Marker posts frame the ditch so it reads as a test feature, not a random
+  // hole in the world. No colliders: they must not damage the approach.
+  for (const [x, z] of [
+    [31.2, 14.4],
+    [31.2, 35.6],
+    [34.8, 14.4],
+    [34.8, 35.6],
+  ] as const) {
+    addMarkerPost(scene, x, z, 0xf0c35a);
+  }
+
+  // Single-wheel rollover ramp: the car approaches east along z≈24.5, so the
+  // left wheels ride this 1.6 m-wide ramp while the right wheels stay low.
+  const half = W4_RAMP_LENGTH / 2;
+  const rampCenterY =
+    Math.sin(W4_RAMP_ANGLE) * half - Math.cos(W4_RAMP_ANGLE) * 0.2 + 0.02;
+  box({
+    size: [W4_RAMP_LENGTH, 0.4, W4_RAMP_WIDTH],
+    position: [W4_RAMP_CENTER_X, rampCenterY, W4_RAMP_CENTER_Z],
+    rotation: [0, 0, W4_RAMP_ANGLE],
+    color: 0x8a6a3a,
+    friction: 1,
+    surface: SURFACES.dirt,
+  });
+
+  // Low-speed damage source; one hit costs ~22 health, two hits put the car
+  // in comfortable range for the +35 repair check.
+  box({
+    size: [2.2, 1.0, 3.0],
+    position: [60, 0.5, 21.5],
+    color: 0x8a8a82,
+    friction: 0.9,
+    surface: SURFACES.rock,
+  });
+
+  // A gentle dirt apron so the rollover ramp reads as part of the pad.
+  addGroundMark(scene, 10, 6, 50, 21.5, 0x5f6b47);
+}
+
+function addMarkerPost(scene: THREE.Scene, x: number, z: number, color: number): void {
+  const material = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.4, 8), material);
+  post.position.set(x, 0.7, z);
+  post.castShadow = true;
+  scene.add(post);
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.1, 0.18, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1d2328, roughness: 0.8 }),
+  );
+  band.position.set(x, 1.15, z);
+  scene.add(band);
+}
+
+function addGroundMark(
+  scene: THREE.Scene,
+  width: number,
+  depth: number,
+  x: number,
+  z: number,
+  color: number,
+): void {
+  const mark = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  mark.rotation.x = -Math.PI / 2;
+  mark.position.set(x, 0.035, z);
+  scene.add(mark);
 }
 
 function addMudSlope(
@@ -324,6 +551,8 @@ function addSign(
   y: number,
   z: number,
   color: number,
+  yaw = Math.PI,
+  width = 4,
 ): void {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -348,9 +577,9 @@ function addSign(
     transparent: true,
     side: THREE.DoubleSide,
   });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), material);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), material);
   sign.position.set(x, y, z);
-  sign.rotation.y = Math.PI;
+  sign.rotation.y = yaw;
   scene.add(sign);
 
   const pole = new THREE.Mesh(

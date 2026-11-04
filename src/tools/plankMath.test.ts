@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { PLANK, planPlank, plankSagFor, plankSupports } from './plankMath';
 
 describe('W4 plank bridge placement', () => {
+  it('is wide enough for both wheel tracks (the 1.72 m vehicle track)', () => {
+    expect(PLANK.width).toBeGreaterThan(1.72);
+  });
+
   it('places the board 4.4 m ahead with its ends 2 m either side', () => {
     const supports = plankSupports(0, 0, 0);
     expect(supports.center.z).toBeCloseTo(PLANK.ahead, 6);

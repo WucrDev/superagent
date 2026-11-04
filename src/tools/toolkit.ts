@@ -61,6 +61,8 @@ export class Toolkit {
   private wheelMoved = false;
   private damageCooldown = 0;
   private damageTotal = 0;
+  /** Keep the "repair done" toast up while G is still held with an empty stack. */
+  private repairDoneCooldown = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -100,6 +102,7 @@ export class Toolkit {
   update(dt: number, input: ToolInput): void {
     this.message.time = Math.max(0, this.message.time - dt);
     this.damageCooldown = Math.max(0, this.damageCooldown - dt);
+    this.repairDoneCooldown = Math.max(0, this.repairDoneCooldown - dt);
 
     this.updateWheel(input);
     if (input.slot !== null) this.inventory.select(input.slot);
@@ -209,6 +212,7 @@ export class Toolkit {
     this.wheelMoved = false;
     this.damageCooldown = 0;
     this.damageTotal = 0;
+    this.repairDoneCooldown = 0;
     this.message = { text: '', tone: 'info', time: 0 };
   }
 
@@ -269,7 +273,12 @@ export class Toolkit {
     if (!this.inventory.has('repair')) {
       this.repairing = false;
       this.repairProgress = 0;
-      this.setMessage('没有维修包了 · 沿路找红色补给箱', 'warn', 1.6);
+      // Holding G through the 2 s animation spends the last kit on the same
+      // frame the repair completes; without this guard the success toast was
+      // overwritten by "no kits left" before the player could read it.
+      if (this.repairDoneCooldown <= 0) {
+        this.setMessage('没有维修包了 · 沿路找红色补给箱', 'warn', 1.6);
+      }
       return;
     }
     if (this.car.healthValue >= VEHICLE_HEALTH.max) {
@@ -302,6 +311,7 @@ export class Toolkit {
         'info',
         2.6,
       );
+      this.repairDoneCooldown = 2.6;
       this.deps.audio?.repairDone();
       this.deps.haptics?.pulse(0.5);
     }
