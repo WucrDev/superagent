@@ -29,6 +29,12 @@ export interface ToolkitDeps {
   effects?: SurfaceEffects;
   haptics?: Haptics;
   hud?: ToolHud;
+  /** Mission hook: a board was successfully placed (world position). */
+  onPlankPlaced?: (x: number, z: number) => void;
+  /** Mission hook: the hydraulic jack finished righting the car. */
+  onJackDone?: () => void;
+  /** Mission hook: a repair kit finished restoring health. */
+  onRepairDone?: () => void;
 }
 
 interface Message {
@@ -216,6 +222,14 @@ export class Toolkit {
     this.message = { text: '', tone: 'info', time: 0 };
   }
 
+  /** Mission restart: fresh consumables, pickups and boards without a reload. */
+  resetRun(): void {
+    this.reset();
+    this.inventory.reset();
+    this.planks.reset();
+    this.pickups.reset();
+  }
+
   /** Debug/test helper: set the car's remaining health. */
   debugSetHealth(health: number): void {
     const target = clamp(health, 0, VEHICLE_HEALTH.max);
@@ -314,6 +328,7 @@ export class Toolkit {
       this.repairDoneCooldown = 2.6;
       this.deps.audio?.repairDone();
       this.deps.haptics?.pulse(0.5);
+      this.deps.onRepairDone?.();
     }
   }
 
@@ -336,6 +351,7 @@ export class Toolkit {
         this.setMessage('千斤顶翻正完成，可以继续', 'info', 2.6);
         this.deps.audio?.jackDone();
         this.deps.haptics?.pulse(0.7);
+        this.deps.onJackDone?.();
       }
       return;
     }
@@ -373,6 +389,7 @@ export class Toolkit {
       this.setMessage(placement.message, 'info', 3);
       this.deps.audio?.plankPlace();
       this.deps.haptics?.pulse(0.4);
+      this.deps.onPlankPlaced?.(placement.pose.centerX, placement.pose.centerZ);
       return true;
     }
     if (placement.reason === 'slip') {

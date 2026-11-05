@@ -1,6 +1,7 @@
 import { clamp } from './math';
 import { WEATHER_ORDER, type WeatherKind } from './weather';
 import { TOOL_META, TOOL_ORDER, type ToolKind } from '../tools/inventory';
+import { FIRST_RUN_ID, type FirstRunSaved } from '../mission/firstRun';
 
 /**
  * W5 #22 / issue #28: a small, validated localStorage save.
@@ -13,6 +14,9 @@ export const SAVE_VERSION = 1 as const;
 export const SAVE_STORAGE_KEY = 'superagent.save.v1';
 
 export type SavedInventory = Record<ToolKind, number>;
+
+/** Mission progress is additive to save v1 so existing W5 saves still load. */
+export type SavedMission = FirstRunSaved;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -27,6 +31,7 @@ export interface SaveData {
   discovered: string[];
   hours: number;
   weather: WeatherKind;
+  mission: SavedMission | null;
 }
 
 /** Minimal subset of Storage so tests can run without a browser. */
@@ -47,6 +52,7 @@ export interface SaveSnapshot {
   discovered: readonly string[];
   hours: number;
   weather: WeatherKind;
+  mission?: SavedMission | null;
   now?: Date;
 }
 
@@ -108,6 +114,26 @@ export function createSaveData(snapshot: SaveSnapshot): SaveData {
     discovered: sanitiseDiscovered(snapshot.discovered),
     hours: clamp(snapshot.hours, 0, 24),
     weather: WEATHER_ORDER.includes(snapshot.weather) ? snapshot.weather : 'clear',
+    mission: sanitiseMission(snapshot.mission),
+  };
+}
+
+const MAX_MISSION_MS = 24 * 60 * 60 * 1000;
+
+function sanitiseMission(value: unknown): SavedMission | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const source = value as Record<string, unknown>;
+  if (source.id !== FIRST_RUN_ID) return null;
+  if (source.status !== 'active' && source.status !== 'complete') return null;
+  if (!isFiniteNumber(source.objectiveIndex)) return null;
+  const elapsedMs = isFiniteNumber(source.elapsedMs) ? source.elapsedMs : 0;
+  const bestMs = isFiniteNumber(source.bestMs) ? source.bestMs : null;
+  return {
+    id: FIRST_RUN_ID,
+    status: source.status,
+    objectiveIndex: Math.round(clamp(source.objectiveIndex, 0, 32)),
+    elapsedMs: clamp(elapsedMs, 0, MAX_MISSION_MS),
+    bestMs: bestMs === null ? null : clamp(bestMs, 0, MAX_MISSION_MS),
   };
 }
 
@@ -156,6 +182,7 @@ export function parseSaveData(raw: string | null): SaveData | null {
     discovered: sanitiseDiscovered(source.discovered),
     hours: clamp(source.hours, 0, 24),
     weather: weather as WeatherKind,
+    mission: sanitiseMission(source.mission),
   };
 }
 

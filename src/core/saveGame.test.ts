@@ -90,4 +90,57 @@ describe('save/checkpoint data', () => {
     expect(data.version).toBe(SAVE_VERSION);
     expect(new Date(data.savedAt).toISOString()).toBe(data.savedAt);
   });
+
+  it('round-trips additively stored first-run mission progress', () => {
+    const storage = memoryStorage();
+    const data = createSaveData(
+      snapshot({
+        mission: {
+          id: 'first-run',
+          status: 'active',
+          objectiveIndex: 3,
+          elapsedMs: 125_400,
+          bestMs: 512_000,
+        },
+      }),
+    );
+    expect(data.mission?.objectiveIndex).toBe(3);
+    expect(writeSave(storage, data)).toBe(true);
+    expect(loadSave(storage)?.mission).toEqual(data.mission);
+  });
+
+  it('sanitises or drops invalid mission progress without rejecting the save', () => {
+    const base = createSaveData(snapshot());
+    const parsed = parseSaveData(
+      JSON.stringify({
+        ...base,
+        mission: {
+          id: 'first-run',
+          status: 'active',
+          objectiveIndex: 999,
+          elapsedMs: -4,
+          bestMs: -1,
+        },
+      }),
+    );
+    expect(parsed).not.toBeNull();
+    expect(parsed!.mission).toEqual({
+      id: 'first-run',
+      status: 'active',
+      objectiveIndex: 32,
+      elapsedMs: 0,
+      bestMs: 0,
+    });
+
+    const foreign = parseSaveData(
+      JSON.stringify({ ...base, mission: { ...base.mission, id: 'other', status: 'active' } }),
+    );
+    expect(foreign).not.toBeNull();
+    expect(foreign!.mission).toBeNull();
+
+    const missing = parseSaveData(JSON.stringify({ ...base, mission: undefined }));
+    expect(missing).not.toBeNull();
+    expect(missing!.mission).toBeNull();
+    expect(parseSaveData(JSON.stringify(base))?.mission).toBeNull();
+  });
 });

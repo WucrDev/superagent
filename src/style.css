@@ -1168,3 +1168,276 @@ body.record-mode #worldNotice {
 body.record-mode {
   cursor: none;
 }
+
+/* W5 follow-up: "第一趟" directed mission card, intro and completion. */
+#missionHud {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 13;
+  width: min(310px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid rgba(240, 195, 90, 0.38);
+  border-radius: 12px;
+  background: rgba(10, 14, 10, 0.72);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  color: #dbe6d2;
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(10px);
+}
+
+#missionHud[hidden] {
+  display: none;
+}
+
+#missionHud .mission-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+#missionHud .mission-tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(240, 195, 90, 0.18);
+  color: #f0c35a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+#missionTimer {
+  color: #9fb18f;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+#missionRestart {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid rgba(240, 195, 90, 0.35);
+  border-radius: 6px;
+  background: rgba(240, 195, 90, 0.08);
+  color: #f0c35a;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+#missionRestart[hidden] {
+  display: none;
+}
+
+#missionRestart:hover {
+  background: rgba(240, 195, 90, 0.2);
+}
+
+#missionObjective {
+  color: #f6e7bd;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+#missionHint {
+  margin-top: 3px;
+  color: #b8c7a8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+#missionChecklist {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mission-step {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #7e8c73;
+  font-size: 10px;
+}
+
+.mission-step-mark {
+  width: 1em;
+  color: #64705a;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.mission-step.done {
+  color: #9fe0a0;
+}
+
+.mission-step.done .mission-step-mark {
+  color: #9fe0a0;
+}
+
+.mission-step.current {
+  color: #f0c35a;
+  font-weight: 600;
+}
+
+.mission-step.current .mission-step-mark {
+  color: #f0c35a;
+}
+
+#missionIntro,
+#missionComplete {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 7, 4, 0.76);
+  backdrop-filter: blur(5px);
+}
+
+#missionIntro[hidden],
+#missionComplete[hidden] {
+  display: none;
+}
+
+#missionIntro .mission-card,
+#missionComplete .mission-card {
+  width: min(560px, calc(100vw - 40px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px 26px 22px;
+  border: 1px solid rgba(240, 195, 90, 0.42);
+  border-radius: 16px;
+  background: rgba(12, 17, 12, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  color: #dbe6d2;
+  pointer-events: auto;
+}
+
+#missionIntro .mission-kicker,
+#missionComplete .mission-kicker {
+  color: #8a9a80;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+
+#missionIntro h1,
+#missionComplete h1 {
+  margin: 6px 0 8px;
+  color: #f0c35a;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#missionIntro .mission-lead {
+  margin: 0 0 12px;
+  color: #c8d5bd;
+  font-size: 13px;
+}
+
+#missionIntro .mission-brief {
+  margin: 0;
+  padding-left: 20px;
+  color: #b8c7a8;
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+#missionIntro .mission-meta {
+  margin: 14px 0 16px;
+  color: #7e8c73;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+#missionIntro button,
+#missionComplete button {
+  padding: 10px 16px;
+  border: 1px solid rgba(240, 195, 90, 0.6);
+  border-radius: 8px;
+  background: rgba(240, 195, 90, 0.16);
+  color: #f6e7bd;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#missionIntro button:hover,
+#missionComplete button:hover {
+  background: rgba(240, 195, 90, 0.3);
+}
+
+.mission-time {
+  margin: 4px 0 10px;
+  color: #e9f0e4;
+  font-size: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+#missionPhoto {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin: 6px 0 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+}
+
+#missionPhoto[hidden] {
+  display: none;
+}
+
+#missionCompleteSummary {
+  margin: 0 0 14px;
+  color: #b8c7a8;
+  font-size: 12px;
+}
+
+#missionComplete .mission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* The mission cards already explain focus/start; do not stack the global
+   focus card on top of them. */
+body.mission-overlay #focusHint {
+  display: none;
+}
+
+/* Photo mode and the recording cinematic hide all gameplay DOM. */
+body.photo-mode #missionHud,
+body.photo-mode #missionIntro,
+body.photo-mode #missionComplete,
+body.record-mode #missionHud,
+body.record-mode #missionIntro,
+body.record-mode #missionComplete {
+  display: none !important;
+}
+
+@media (max-width: 600px) {
+  #missionHud {
+    top: auto;
+    right: 10px;
+    bottom: calc(300px + env(safe-area-inset-bottom, 0px));
+    width: min(260px, calc(100vw - 20px));
+    padding: 9px 11px;
+    font-size: 10px;
+  }
+
+  #missionHud #missionHint {
+    display: none;
+  }
+}
