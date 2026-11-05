@@ -83,6 +83,8 @@ After（W5，同一机位）：[`w5-after-cockpit.png`](images/w5-after-cockpit.
 
 **缺口（必须由人拍板）**：#21 的验收要求“与 3 张目标图的观感差距可接受”，但仓库里没有目标图；`docs/production-plan.md` 把“目标图 3–5 张”列在 P2，而 W5 已引用它。当前实现是中性胶片 v0，**没有目标图就不能宣布观感通过**。请所有者决定：先按当前 v0 继续，还是先补 3 张目标图再定调。
 
+> **2026-11-06 W5.1 更新**：3 张目标图已补到 [`docs/target-shots/`](target-shots/README.md)，并已把游戏内固定 grade 冻结为 `LOCKED_GRADE`；对照、限制与制作人独立验收见 [`docs/w5-color-lock.md`](w5-color-lock.md)。#21 的客观“目标图可对照”已补齐；最终观感仍待人工确认。
+
 ## 4. #22 存档与检查点 v0
 
 - 木屋位于出生点西侧，驶近 `(-9.6, 4.2)`、半径 5.5 m 的检查点即自动写入 localStorage（版本 1）。

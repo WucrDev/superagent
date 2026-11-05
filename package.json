@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "record": "npm run build && node scripts/record-demo.mjs"
+    "record": "npm run build && node scripts/record-demo.mjs",
+    "capture:grade": "npm run build && node scripts/capture-grade-lock.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

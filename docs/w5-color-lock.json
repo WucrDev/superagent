@@ -1,0 +1,79 @@
+{
+  "url": "http://127.0.0.1:4175/?fresh=1",
+  "capturedAt": "2026-11-05T18:19:57.034Z",
+  "results": [
+    {
+      "scene": "dusk",
+      "label": "黄昏山脊",
+      "file": "docs/images/w5-lock-dusk.png",
+      "id": "dusk",
+      "time": 17.6,
+      "weather": "clear",
+      "x": 7,
+      "z": 61,
+      "yaw": -0.55,
+      "camera": "free",
+      "fov": 55,
+      "orbitYaw": 2.670353755551324,
+      "orbitPitch": 0.15,
+      "freeDistance": 7,
+      "stops": 0,
+      "mean": [
+        52.3,
+        36.6,
+        36.9
+      ],
+      "lumaP5": 0,
+      "lumaP50": 5,
+      "lumaP95": 136
+    },
+    {
+      "scene": "night",
+      "label": "夜雨车灯",
+      "file": "docs/images/w5-lock-night.png",
+      "id": "night",
+      "time": 21,
+      "weather": "rain",
+      "x": -13,
+      "z": 100,
+      "yaw": 0,
+      "camera": "free",
+      "fov": 60,
+      "orbitYaw": 0.5,
+      "orbitPitch": 0.25,
+      "freeDistance": 8,
+      "stops": 0,
+      "mean": [
+        1.2,
+        2.1,
+        15.3
+      ],
+      "lumaP5": 0,
+      "lumaP50": 1,
+      "lumaP95": 4
+    },
+    {
+      "scene": "cockpit",
+      "label": "座舱",
+      "file": "docs/images/w5-lock-cockpit.png",
+      "id": "cockpit",
+      "time": 17.4,
+      "weather": "clear",
+      "x": 0,
+      "z": 0,
+      "yaw": 0,
+      "camera": "cockpit",
+      "fov": 70,
+      "lookPitch": -0.04,
+      "stops": 0,
+      "mean": [
+        51.7,
+        40.5,
+        35.2
+      ],
+      "lumaP5": 0,
+      "lumaP50": 26,
+      "lumaP95": 145
+    }
+  ]
+}
