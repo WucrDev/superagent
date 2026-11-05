@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { SURFACES, TerrainField, gripCurve, slopeDegFromNormal } from './surfaces';
+import {
+  SURFACES,
+  TerrainField,
+  gripCurve,
+  slopeDegFromNormal,
+  weatherGripMultiplier,
+} from './surfaces';
 
 describe('surface materials', () => {
   it('has four explicit W2 materials plus the dry-dirt baseline', () => {
@@ -27,6 +33,17 @@ describe('surface materials', () => {
   it('converts contact normals to degrees', () => {
     expect(slopeDegFromNormal(1)).toBeCloseTo(0, 5);
     expect(slopeDegFromNormal(Math.cos(Math.PI / 6))).toBeCloseTo(30, 4);
+  });
+
+  it('soaks dry dirt to half grip, enough to require a ~30 % slower entry speed', () => {
+    expect(weatherGripMultiplier(SURFACES.dirt, 0)).toBe(1);
+    const wetDirt = weatherGripMultiplier(SURFACES.dirt, 1);
+    expect(wetDirt).toBeCloseTo(0.46, 5);
+    // Same stopping distance: v_wet / v_dry = sqrt(mu_wet / mu_dry).
+    expect(Math.sqrt(wetDirt)).toBeLessThan(0.69);
+    // Already-wet mud and rock keep more of their grip than dry dirt.
+    expect(weatherGripMultiplier(SURFACES.wetMud, 1)).toBeCloseTo(1, 5);
+    expect(weatherGripMultiplier(SURFACES.rock, 1)).toBeGreaterThan(wetDirt);
   });
 });
 

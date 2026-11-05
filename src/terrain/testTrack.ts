@@ -523,17 +523,6 @@ function addWater(
   water.position.set(options.x, options.level, options.z);
   scene.add(water);
 
-  const rimMaterial = new THREE.MeshBasicMaterial({
-    color: options.color,
-    transparent: true,
-    opacity: 0.35,
-    side: THREE.DoubleSide,
-  });
-  const rim = new THREE.Mesh(new THREE.RingGeometry(1, 2, 32), rimMaterial);
-  rim.rotation.x = -Math.PI / 2;
-  rim.position.set(options.x, options.level + 0.01, options.z);
-  scene.add(rim);
-
   field.addWater({
     x: options.x,
     z: options.z,
@@ -575,10 +564,17 @@ function addSign(
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.06, width / 4 + 0.06, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x1a1e17, roughness: 0.9 }),
+  );
+  board.position.set(x, y, z);
+  board.rotation.y = yaw;
+  scene.add(board);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), material);
-  sign.position.set(x, y, z);
+  sign.position.set(x + Math.sin(yaw) * 0.021, y, z + Math.cos(yaw) * 0.021);
   sign.rotation.y = yaw;
   scene.add(sign);
 

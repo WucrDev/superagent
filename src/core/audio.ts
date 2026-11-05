@@ -18,6 +18,8 @@ export class EngineAudio {
   private creakGain?: GainNode;
   private jack?: OscillatorNode;
   private jackGain?: GainNode;
+  private rainSource?: AudioBufferSourceNode;
+  private rainGain?: GainNode;
   private noise?: AudioBuffer;
   private started = false;
   private muted = false;
@@ -90,6 +92,20 @@ export class EngineAudio {
         samples[index] = Math.random() * 2 - 1;
       }
 
+      // W5 #20: a filtered noise loop for rain; gain is weather-driven.
+      const rainSource = context.createBufferSource();
+      rainSource.buffer = noise;
+      rainSource.loop = true;
+      const rainFilter = context.createBiquadFilter();
+      rainFilter.type = 'lowpass';
+      rainFilter.frequency.value = 1400;
+      const rainGain = context.createGain();
+      rainGain.gain.value = 0;
+      rainSource.connect(rainFilter);
+      rainFilter.connect(rainGain);
+      rainGain.connect(context.destination);
+      rainSource.start();
+
       this.context = context;
       this.engine = engine;
       this.engineGain = gain;
@@ -101,6 +117,8 @@ export class EngineAudio {
       this.creakGain = creakGain;
       this.jack = jack;
       this.jackGain = jackGain;
+      this.rainSource = rainSource;
+      this.rainGain = rainGain;
       this.noise = noise;
     } catch {
       // Silent fallback: the prototype must still run without audio.
@@ -390,6 +408,31 @@ export class EngineAudio {
     oscillator.stop(now + 0.17);
   }
 
+  /** W5 #20: rain-bed level follows the weather transition. */
+  setRain(amount: number): void {
+    if (!this.context || !this.rainGain) return;
+    const level = this.muted ? 0 : Math.max(0, Math.min(1, amount)) * 0.055;
+    this.rainGain.gain.setTargetAtTime(level, this.context.currentTime, 0.25);
+  }
+
+  /** W5 #19: a two-stage mechanical shutter click for photo mode. */
+  cameraShutter(): void {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime;
+    this.playNoise(0.045, 0.09, 5200);
+    const oscillator = this.context.createOscillator();
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(260, now + 0.03);
+    oscillator.frequency.exponentialRampToValueAtTime(90, now + 0.09);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.03, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+    oscillator.connect(gain);
+    gain.connect(this.context.destination);
+    oscillator.start(now + 0.03);
+    oscillator.stop(now + 0.12);
+  }
+
   private playNoise(duration: number, level: number, cutoff: number): void {
     if (!this.context || !this.noise) return;
     const now = this.context.currentTime;
@@ -418,6 +461,7 @@ export class EngineAudio {
     this.winch?.stop();
     this.creak?.stop();
     this.jack?.stop();
+    this.rainSource?.stop();
     void this.context?.close();
   }
 }

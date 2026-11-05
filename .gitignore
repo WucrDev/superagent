@@ -9,3 +9,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# W5 recording intermediate (npm run record keeps the MP4, not the WebM)
+docs/w5-60s.webm

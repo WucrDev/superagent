@@ -44,6 +44,27 @@ export interface ToolInput {
   useHeld: boolean;
 }
 
+/**
+ * W5 #19/#20: photo, weather and clock controls. These are sampled separately
+ * so the tool digits can keep their gameplay meaning outside photo mode.
+ */
+export interface WorldInput {
+  /** Edge: enter/leave photo mode (P). */
+  photoToggle: boolean;
+  /** Edge: shutter (Space) while photo mode is active. */
+  shutter: boolean;
+  /** Edge: one stop darker ( [ ). */
+  exposureDown: boolean;
+  /** Edge: one stop brighter ( ] ). */
+  exposureUp: boolean;
+  /** 1-5 photo filter selection while photo mode is active. */
+  filter: number | null;
+  /** Edge: toggle the 8x world clock (N). */
+  fastTime: boolean;
+  /** Edge: cycle clear -> rain -> fog (B). */
+  weather: boolean;
+}
+
 export type InputDevice = 'keyboard' | 'gamepad' | 'none';
 
 export interface InputSettings {
@@ -76,7 +97,13 @@ const DRIVING_KEYS = new Set([
   'Digit2',
   'Digit3',
   'Digit4',
+  'Digit5',
   'Backspace',
+  'KeyP',
+  'KeyN',
+  'KeyB',
+  'BracketLeft',
+  'BracketRight',
   'ArrowUp',
   'ArrowLeft',
   'ArrowDown',
@@ -94,7 +121,14 @@ const TOOL_EDGE_KEYS = new Set([
   'Digit2',
   'Digit3',
   'Digit4',
+  'Digit5',
   'Backspace',
+  'KeyP',
+  'KeyN',
+  'KeyB',
+  'BracketLeft',
+  'BracketRight',
+  'Space',
 ]);
 
 const WHEEL_TAP_TIME = 0.32;
@@ -342,6 +376,39 @@ export class InputManager {
     this.toolAutoHeld = autoHeld;
     this.toolHudHeld = hudHeld;
     return input;
+  }
+
+  /** W5 photo/weather/time controls; call once per fixed step. */
+  sampleWorld(photoActive: boolean): WorldInput {
+    const photoToggle = this.pressed.has('KeyP');
+    const fastTime = this.pressed.has('KeyN');
+    const weather = this.pressed.has('KeyB');
+    let shutter = false;
+    let exposureDown = false;
+    let exposureUp = false;
+    let filter: number | null = null;
+    if (photoActive) {
+      shutter = this.pressed.has('Space');
+      exposureDown = this.pressed.has('BracketLeft');
+      exposureUp = this.pressed.has('BracketRight');
+      for (let index = 0; index < 5; index += 1) {
+        if (this.pressed.has(`Digit${index + 1}`)) filter = index;
+      }
+      for (const code of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']) {
+        this.pressed.delete(code);
+      }
+    }
+    for (const code of [
+      'KeyP',
+      'KeyN',
+      'KeyB',
+      'BracketLeft',
+      'BracketRight',
+      'Space',
+    ]) {
+      this.pressed.delete(code);
+    }
+    return { photoToggle, shutter, exposureDown, exposureUp, filter, fastTime, weather };
   }
 
   /** Mouse look accumulated since the previous render frame (pixels). */

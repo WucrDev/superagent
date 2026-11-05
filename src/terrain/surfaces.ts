@@ -107,6 +107,31 @@ export function gripCurve(slipSpeed: number): number {
   return clamp(1 - (speed - 1.5) * 0.05, 0.6, 1);
 }
 
+/**
+ * W5 #20 / issue #26: how much friction a surface keeps when soaked by rain.
+ *
+ * Dry dirt loses over half its grip (μ = 0.46), so stopping distance roughly
+ * doubles: keeping the same stopping distance needs sqrt(0.46) ≈ 0.68 of the
+ * dry entry speed, i.e. a 32 % slowdown before the night visibility penalty.
+ * Mud is already wet and barely changes; snow packs and gets slightly more
+ * predictable.
+ */
+export const WET_GRIP: Record<SurfaceId, number> = {
+  dirt: 0.46,
+  mud: 0.9,
+  wetMud: 1,
+  rock: 0.62,
+  snow: 0.8,
+  wood: 0.72,
+  water: 1,
+};
+
+/** 1 = dry grip, lower values scale both longitudinal and lateral tire forces. */
+export function weatherGripMultiplier(surface: Surface, wetness: number): number {
+  const wet = clamp(wetness, 0, 1);
+  return 1 - wet * (1 - WET_GRIP[surface.id]);
+}
+
 export function slopeDegFromNormal(normalY: number): number {
   return (Math.acos(clamp(normalY, -1, 1)) * 180) / Math.PI;
 }
