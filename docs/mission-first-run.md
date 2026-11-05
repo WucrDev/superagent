@@ -87,12 +87,12 @@ W4 停车框 (28.6, 24.1) ── 2 选木板 + G 架桥 ──▶ 2 m 沟东岸 
 | 8 | 沿缓坡向北到山脊观景点，停在 x≈6.9/z≈59.5 | POI「山脊观景点」；**idx=3（拍照目标）** |
 | 9 | `P` → `Space` → `P` | `photo.isActive=true`；拍照后 **idx=4**；HUD「完成目标 4/5：山脊拍照」；1280×720 PNG 已生成 |
 | 10 | 南侧下坡 → 山西侧 → 木屋北侧，停 x≈-9.9/z≈9.1 | 进入木屋检查点；**idx=5，status=complete**；health≈65.9 |
-| 11 | 观察完成页 | 完成页可见；用时 **01:42**；山脊照片缩略图可见；存档 `mission.status=complete` |
+| 11 | 观察完成页 | 完成页可见；用时 **01:43**；山脊照片缩略图可见；存档 `mission.status=complete` |
 | 12 | 点「再跑一趟」/「重开」 | 回到 x≈0/z≈0，车况 100，planks 2，repair 1，idx=0，计时归零 |
 
 > `R` 是游戏内既有复位键（README 控制表），不是 `car.place`/`teleport`/调试命令；主验收路径只用了一次 `R`（目标 2→3 回起点）。也可以从侧翻坡原路开回，但没有作为验收路径。
 
-脚本输出（最终 build `index-LVtZef33.js`）：
+脚本输出（最终 build `index-BTIP9LkL.js`）：
 
 ```json
 {
@@ -106,19 +106,19 @@ W4 停车框 (28.6, 24.1) ── 2 选木板 + G 架桥 ──▶ 2 m 沟东岸 
     "id": "first-run",
     "status": "complete",
     "objectiveIndex": 5,
-    "elapsedMs": 102799,
-    "bestMs": 102799
+    "elapsedMs": 103377,
+    "bestMs": 103377
   },
   "completeVisible": true,
-  "completeTime": "01:42",
+  "completeTime": "01:43",
   "photoVisible": true,
   "consoleErrors": []
 }
 ```
 
-> 01:42 是脚本按已知路线、无停车看牌的连续驾驶成绩；第一次玩的玩家需要读任务卡/找路/试工具，预计 10–20 分钟。这个体感区间尚未由人工计时确认，列在待验收项。
+> 01:43 是脚本按已知路线、无停车看牌的连续驾驶成绩；第一次玩的玩家需要读任务卡/找路/试工具，预计 10–20 分钟。这个体感区间尚未由人工计时确认，列在待验收项。
 
-### 截图（均为最终 build `LVtZef33`，1280×720，GPU Chrome）
+### 截图（均为最终 build `BTIP9LkL`，1280×720，GPU Chrome）
 
 | 截图 | 内容 |
 |---|---|
@@ -129,7 +129,7 @@ W4 停车框 (28.6, 24.1) ── 2 选木板 + G 架桥 ──▶ 2 m 沟东岸 
 | ![winched](images/first-run-winched.png) | 起手锚点收绳，完成目标 3/5，提示 `G` 松绳 |
 | ![ridge](images/first-run-ridge.png) | 山脊观景点，目标 4/5 等待拍照 |
 | ![photo](images/first-run-photo.png) | 拍照模式快门，HUD 隐藏，照片已保存 |
-| ![complete](images/first-run-complete.png) | 完成页：01:42 + 山脊照片 + 再跑一趟 |
+| ![complete](images/first-run-complete.png) | 完成页：01:43 + 山脊照片 + 再跑一趟 |
 | ![resume](images/first-run-resume.png) | 刷新后从木屋检查点继续目标 3/5 |
 
 ## 6. 测试与命令
@@ -154,7 +154,7 @@ W4 停车框 (28.6, 24.1) ── 2 选木板 + G 架桥 ──▶ 2 m 沟东岸 
 npm run typecheck  → 通过
 npm test           → 15 files / 102 tests 通过
 npm run build      → 通过
-dist/assets/index-LVtZef33.js
+dist/assets/index-BTIP9LkL.js
 dist/assets/index-FhVE_owq.css
 ```
 
@@ -185,7 +185,7 @@ complete → save complete/idx5 → reload → 任务卡「第一趟完成 · �
 ## 7. 已知限制 / 待验收
 
 - **制作人独立验收未做**：本文件是 worker 自测/预检，不代替制作人从 fresh load 独立走查；未合并、未部署、不自动合并。
-- **人类 10–20 分钟尚未实测**：脚本连续驾驶 01:42；第一次玩预计 10–20 分钟，但需要人工计时确认。主观节奏/任务卡可读性/完成页观感待人工验收。
+- **人类 10–20 分钟尚未实测**：脚本连续驾驶 01:43；第一次玩预计 10–20 分钟，但需要人工计时确认。主观节奏/任务卡可读性/完成页观感待人工验收。
 - **回程用了普通 `R` 复位**：目标 2→3 的回起点使用 `R`（README 既有控制，不是调试传送）。也可以原路驾驶回起点，但没有作为验收路径；若制作人要求纯连续驾驶，需要再补一条无 `R` 的回程证据。
 - **W3 试炼的出口**：任务接受 W3 湿泥试炼作为绞盘地点；但实测从试炼坡收绳后车可能停在 35° 坡上，继续开去山脊前需要倒车/复位。主路径因此使用出生点练习锚点；W3 只作为可选教学点。
 - **照片时段**：任务不锁定时间；按 24 分钟一游戏日，慢玩到山脊可能偏黄昏/夜晚，完成页照片会更暗。截图是在 16:00 出发的白天路径。

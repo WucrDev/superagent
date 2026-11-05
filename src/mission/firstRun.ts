@@ -60,7 +60,7 @@ export const FIRST_RUN_OBJECTIVES: readonly FirstRunObjective[] = [
     id: 'return',
     label: '回木屋',
     title: '开回木屋检查点',
-    hint: '回出生点西侧的木屋检查点，本趟自动完成并保存。',
+    hint: '从山脊南侧下坡，绕到山西侧再回木屋检查点；卡住可按 R 回起点再开回木屋。',
   },
 ] as const;
 
