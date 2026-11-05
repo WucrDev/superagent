@@ -1,0 +1,48 @@
+{
+  "fps": {
+    "chase": {
+      "frames": 301,
+      "seconds": 5.00729999999702,
+      "fps": 60.11223613527832
+    },
+    "cockpit": {
+      "frames": 301,
+      "seconds": 5.0098000000044705,
+      "fps": 60.08223881187501
+    },
+    "dropPct": 0.04990219185293286,
+    "atMost10Pct": true
+  },
+  "winch": {
+    "selection": {
+      "selected": true,
+      "state": "ready",
+      "hook": null
+    },
+    "hooked": {
+      "state": "attached",
+      "anchor": "泥坑树 A",
+      "tension": 62.20541772688848
+    },
+    "hud": {
+      "winchHud": true,
+      "angleRing": true
+    },
+    "before": {
+      "x": 50.0720329284668,
+      "z": 149.94265747070312
+    },
+    "after": {
+      "x": 51.27791213989258,
+      "z": 154.7377166748047
+    },
+    "moved": 4.944364210228447,
+    "pull": {
+      "state": "attached",
+      "anchor": "泥坑树 A",
+      "tension": 19.102839100793616,
+      "hudVisible": true
+    }
+  },
+  "errors": []
+}

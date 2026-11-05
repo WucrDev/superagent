@@ -9,7 +9,7 @@
 
 | 任务 | 状态 | 主要证据 |
 |---|---|---|
-| #19 相机、座舱与摄影 v0 | 客观项通过；“值得发的截图”投票待人工 | 拍照模式 UI、1920×1080 抓拍、座舱截图、顶视图叠合 |
+| #19 相机、座舱与摄影 v0 | 客观项通过（含座舱绞盘/HUD/掉帧）；“值得发的截图”投票待人工 | 拍照模式 UI、1920×1080 抓拍、座舱截图、顶视图叠合、座舱绞盘与 FPS |
 | #20 昼夜与基础天气 | 客观项通过；夜雨手感待人工 | 24 min 日循环、雨/雾、车灯、湿滑制动测量 |
 | #21 后期与调色 v0 | 固定管线完成；**3 张目标图缺失，无法完成观感比对** | `PHOTO_FILTERS` + 固定 grade、示例图 |
 | #22 存档与检查点 v0 | 通过（自动化强退重开） | 木屋检查点、localStorage 快照、重开后的数值 |
@@ -39,6 +39,7 @@ After（W5 拍照模式）：[`w5-photo-ui.png`](images/w5-photo-ui.png)
 - 比例：车身 1.80 × 4.00 m，外模座舱宽 1.50 m；仪表台 1.48 m（相对误差 1.3%）；方向盘/眼点/驾驶座中心均为 x = -0.32 m（0% 偏差）；眼点 y = 0.54 m，座舱顶 0.76 m，外模车顶 0.80 m。
 - 座舱视角：`driverEye (-0.32, 0.54, -0.10)`，FOV 默认 70（60–90 可调），左右 ±90°、上下 ±45°。
 - 从座舱能拍到方向盘 + 仪表台 + 前方路况；见 [`w5-cockpit.png`](images/w5-cockpit.png)。
+- **座舱绞盘/HUD（cockpit-design §4 第 5 条）**：在 W3 湿泥地 (50,150) 用座舱机位选择/挂上“泥坑树 A”，按 H 打开张力条与角度环，按住 F 3.2 s 后车辆位移 **4.94 m**（x 50.07→51.28，z 149.94→154.74），绳索保持 attached，HUD 可读。截图 [`w5-cockpit-winch.png`](images/w5-cockpit-winch.png)，原始数据 [`w5-cockpit-check.json`](w5-cockpit-check.json)。完整 35° 湿泥坡脱困仍以 W3 验收为准。
 
 Before（W4 build `CNvtFRAR`，同一 1280×720、同一出生点、HUD 隐藏）：[`w5-before-cockpit.png`](images/w5-before-cockpit.png)
 After（W5，同一机位）：[`w5-after-cockpit.png`](images/w5-after-cockpit.png)
@@ -51,8 +52,8 @@ After（W5，同一机位）：[`w5-after-cockpit.png`](images/w5-after-cockpit.
 
 ### 1.3 切换与性能
 
-- 第三人称 ↔ 自由 ↔ 座舱由 `C` 循环，切换时 `car.setCockpit()` 隐藏外模/显示内饰，相机由 `CameraRig` 阻尼跟随。**20 次连续切换实测**：模式按 free→cockpit→chase 循环，`cockpit` 与外模 `visible` 一致，console 0 error（1280×720）。
-- 座舱视角与第三人称使用同一 `WebGLRenderer`/`PostFx`；未单独测掉帧（无 GPU 计时器），列为待人工/后续性能项。
+- 第三人称 ↔ 自由 ↔ 座舱由 `C` 循环，切换时 `car.setCockpit()` 隐藏外模/显示内饰，相机由 `CameraRig` 阻尼跟随。**20 次连续切换实测**：模式按 free→cockpit→chase 循环，`cockpit` 与外模 `visible` 一致，console 0 error（1280×720）。原始记录 [`w5-switch-check.json`](w5-switch-check.json)。
+- 座舱视角与第三人称使用同一 `WebGLRenderer`/`PostFx`；**1280×720 同场景各 5 s** 的 rAF 实测：第三人称 60.11 fps、座舱 60.08 fps，掉帧 **0.05%**（≤10%）。原始数据 [`w5-cockpit-check.json`](w5-cockpit-check.json)。
 
 ## 2. #20 昼夜与基础天气
 
@@ -123,6 +124,8 @@ npm run typecheck  → 通过
 npm test           → 14 个文件 / 89 项通过
 npm run build      → 通过，dist/assets/index-*.js
 npm run record     → docs/w5-60s.mp4（1920×1080, 60/1, 59.40 s, 29.0 MB）
+node（临时浏览器脚本） → docs/w5-cockpit-check.json（FPS + 座舱绞盘）
+node（临时浏览器脚本） → docs/w5-switch-check.json（20 次切换）
 ```
 
 ## 7. 已知限制
@@ -130,5 +133,23 @@ npm run record     → docs/w5-60s.mp4（1920×1080, 60/1, 59.40 s, 29.0 MB）
 - 目标图缺失：见 §3。
 - “值得发的截图”投票、夜雨手感、调色观感、座舱盲认/多车型均为人工项，未代填。
 - 座舱内饰仍是低模 blockout；外模没有精模三视图，叠合是常量测量 + 同机位顶视，不是美术精模比对。
+- 座舱绞盘验证是湿泥地挂钩/收绳 4.94 m，不是完整 35° 湿泥坡脱困（后者以 W3 验收为准）。
 - 音频/手柄/真实手机触屏仍未在 headless 环境验证；录屏为 canvas-only，无音轨。
-- 制作人独立验收尚未执行；本页是 worker 自测，不是最终验收结论。
+- **独立制作人验收：有条件通过**（见 §8）；W5 门禁不能算全绿，#21 目标图缺失需所有者决定。
+
+
+## 8. 独立制作人验收
+
+> 执行者：未参与 W5 实现的独立子代理（fresh context），2026-11-06；审查 head `0c29981`，随后补交座舱 FPS/绞盘与切换 artifact。
+
+**结论：有条件通过（conditional pass）**。周交付物（可玩 build、89 项测试、构建、1080p60 视频）真实可用；但 W5 卡不能全绿：
+
+- #21 后期调色：**不通过/不可评估** — 验收要求与 3 张目标图比对，仓库没有目标图（`production-plan.md` 把目标图列为 P2）。必须由所有者决定：按当前 v0 继续，还是先补 3 张目标图再定风格。
+- #19：初审缺座舱绞盘完成证据与 ≤10% 掉帧证据；现已补：
+  - 座舱机位湿泥地挂钩/收绳，车辆移动 4.94 m，张力条/角度环/HUD 可读（[`w5-cockpit-check.json`](w5-cockpit-check.json)、[`w5-cockpit-winch.png`](images/w5-cockpit-winch.png)）；
+  - 1280×720 同场景各 5 s：60.11 → 60.08 fps，掉帧 0.05%（≤10%）。
+  - 仍保留“待人工”：值得发的截图 4/5 投票。
+- #20 客观通过（夜雨湿滑 + 能见度）；“可感知、不作弊感”待人工。
+- #22、#23 客观通过。
+- 主观项（截图投票、调色观感、夜雨手感、座舱盲认）不得写成完成；座舱盲认/多车型按 `cockpit-design.md` 在 P2/P3 新车型时执行。
+- 20 次切换/0 console error 的原始记录已补为 [`w5-switch-check.json`](w5-switch-check.json)。

@@ -1,0 +1,8 @@
+{
+  "switches": 20,
+  "sequence": ["free", "cockpit", "chase", "free", "cockpit", "chase", "free", "cockpit", "chase", "free", "cockpit", "chase", "free", "cockpit", "chase", "free", "cockpit", "chase", "free", "cockpit"],
+  "inconsistent": [],
+  "errors": [],
+  "viewport": "1280x720",
+  "method": "Chrome headless + Playwright; C held 80 ms / released, 90 ms settle per switch"
+}
