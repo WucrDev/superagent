@@ -5,6 +5,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
+import { GAME_GRADE_INDEX, LOCKED_GRADE, PHOTO_FILTERS, type PhotoFilter } from './grade';
+
+export { LOCKED_GRADE, PHOTO_FILTERS };
+export type { PhotoFilter };
+
 /**
  * W5 #21 / issue #27: the fixed film grade and the four photo filters.
  *
@@ -12,71 +17,10 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
  * teal-shadow / warm-highlight split, saturation and contrast. The photo filters
  * are parameter sets over the same shader, so the "look" remains one pipeline
  * and the game can never drift into a different style by accident.
+ *
+ * W5.1 locks index 0 (`LOCKED_GRADE`) to the three target shots; see
+ * `src/core/grade.ts` and `docs/w5-color-lock.md`.
  */
-export interface PhotoFilter {
-  id: string;
-  label: string;
-  grain: number;
-  vignette: number;
-  saturation: number;
-  contrast: number;
-  lift: [number, number, number];
-  gain: [number, number, number];
-}
-
-export const PHOTO_FILTERS: readonly PhotoFilter[] = [
-  {
-    id: 'neutral',
-    label: '原片',
-    grain: 0.018,
-    vignette: 0.24,
-    saturation: 1.02,
-    contrast: 1.03,
-    lift: [-0.004, 0.002, 0.008],
-    gain: [1.03, 1.0, 0.97],
-  },
-  {
-    id: 'film',
-    label: '胶片',
-    grain: 0.055,
-    vignette: 0.4,
-    saturation: 0.9,
-    contrast: 1.05,
-    lift: [0.018, 0.012, 0.002],
-    gain: [1.05, 1.0, 0.9],
-  },
-  {
-    id: 'cool',
-    label: '冷调',
-    grain: 0.03,
-    vignette: 0.3,
-    saturation: 0.88,
-    contrast: 1.04,
-    lift: [-0.006, 0.0, 0.016],
-    gain: [0.93, 1.0, 1.06],
-  },
-  {
-    id: 'warm',
-    label: '暖调',
-    grain: 0.025,
-    vignette: 0.28,
-    saturation: 1.06,
-    contrast: 1.06,
-    lift: [0.02, 0.006, -0.01],
-    gain: [1.08, 1.02, 0.92],
-  },
-  {
-    id: 'faded',
-    label: '褪色',
-    grain: 0.045,
-    vignette: 0.34,
-    saturation: 0.72,
-    contrast: 0.92,
-    lift: [0.026, 0.022, 0.022],
-    gain: [0.98, 0.98, 1.0],
-  },
-];
-
 const gradeShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
@@ -152,7 +96,7 @@ export class PostFx {
     this.grade = new ShaderPass(gradeShader);
     this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
-    this.applyFilter(0);
+    this.applyFilter(GAME_GRADE_INDEX);
     this.applyExposure();
   }
 
