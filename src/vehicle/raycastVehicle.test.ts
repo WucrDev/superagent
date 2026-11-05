@@ -207,6 +207,29 @@ describe('surface feel', () => {
     expect(mud.turnLateral).toBeLessThan(dirt.turnLateral * 0.75);
     expect(rock.turnLateral).toBeGreaterThanOrEqual(dirt.turnLateral * 0.95);
   });
+
+  it('needs a ~30 % lower entry speed to stop on rain-soaked dirt', () => {
+    const dry = createRig({ surface: SURFACES.dirt });
+    simulate(dry, IDLE, 1);
+    accelerateTo(dry, 30);
+    const dryStart = dry.car.position.clone();
+    simulateUntilStopped(dry, { ...IDLE, brake: 1 });
+    const dryDistance = dry.car.position.z - dryStart.z;
+
+    const wet = createRig({ surface: SURFACES.dirt });
+    simulate(wet, IDLE, 1);
+    wet.car.setWetness(1);
+    accelerateTo(wet, 30);
+    const wetStart = wet.car.position.clone();
+    simulateUntilStopped(wet, { ...IDLE, brake: 1 });
+    const wetDistance = wet.car.position.z - wetStart.z;
+
+    expect(wet.car.wetnessValue).toBe(1);
+    expect(wetDistance).toBeGreaterThan(dryDistance * 1.7);
+    // Same stopping distance: v_wet/v_dry = sqrt(dryDistance/wetDistance).
+    const requiredSpeedRatio = Math.sqrt(dryDistance / wetDistance);
+    expect(requiredSpeedRatio).toBeLessThan(0.75);
+  });
 });
 
 beforeAll(async () => {
