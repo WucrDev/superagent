@@ -51,7 +51,7 @@ After（W5，同一机位）：[`w5-after-cockpit.png`](images/w5-after-cockpit.
 
 ### 1.3 切换与性能
 
-- 第三人称 ↔ 自由 ↔ 座舱由 `C` 循环，切换时 `car.setCockpit()` 隐藏外模/显示内饰，相机 0.2–0.3 s 由 `CameraRig` 的阻尼跟随；连续切换 20 次无报错。
+- 第三人称 ↔ 自由 ↔ 座舱由 `C` 循环，切换时 `car.setCockpit()` 隐藏外模/显示内饰，相机由 `CameraRig` 阻尼跟随。**20 次连续切换实测**：模式按 free→cockpit→chase 循环，`cockpit` 与外模 `visible` 一致，console 0 error（1280×720）。
 - 座舱视角与第三人称使用同一 `WebGLRenderer`/`PostFx`；未单独测掉帧（无 GPU 计时器），列为待人工/后续性能项。
 
 ## 2. #20 昼夜与基础天气
