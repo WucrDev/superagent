@@ -421,10 +421,17 @@ function addLabel(
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   });
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(3.26, 0.86, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x1a1e17, roughness: 0.9 }),
+  );
+  board.position.set(x, y, z);
+  board.rotation.y = Math.PI;
+  scene.add(board);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), material);
-  sign.position.set(x, y, z);
+  sign.position.set(x, y, z - 0.021);
   sign.rotation.y = Math.PI;
   scene.add(sign);
   return sign;

@@ -3,10 +3,18 @@ import * as THREE from 'three';
 import type { DrivingInput } from '../core/input';
 import { clamp } from '../core/math';
 import {
+  VEHICLE_HEALTH,
+  applyDamage,
+  applyRepair,
+  powerFactorFor,
+  steerFactorFor,
+} from '../tools/healthMath';
+import {
   SURFACES,
   TerrainField,
   gripCurve,
   slopeDegFromNormal,
+  weatherGripMultiplier,
   type Surface,
 } from '../terrain/surfaces';
 import { Drivetrain, type Gear } from './drivetrain';
@@ -102,6 +110,8 @@ export class RaycastVehicle {
   private readonly chassisCollider: RAPIER.Collider;
   private readonly wheelStates: WheelState[] = [];
   private readonly steeringWheel: THREE.Group;
+  private readonly speedNeedle: THREE.Object3D;
+  private readonly tachNeedle: THREE.Object3D;
   private forwardSpeed = 0;
   private lastSteer = 0;
   private readonly onShift?: () => void;
@@ -113,6 +123,12 @@ export class RaycastVehicle {
   private winchLoad = 0;
   private reverse = false;
   private reverseHold = 0;
+  private health: number = VEHICLE_HEALTH.max;
+  private wetness = 0;
+  private damageFlash = 0;
+  private jackStartPosition = new THREE.Vector3();
+  private jackStartRotation = new THREE.Quaternion();
+  private jacking = false;
 
   constructor(
     scene: THREE.Scene,
@@ -122,7 +138,10 @@ export class RaycastVehicle {
   ) {
     this.onShift = onShift;
     this.buildExterior();
-    this.steeringWheel = this.buildCockpit();
+    const cockpit = this.buildCockpit();
+    this.steeringWheel = cockpit.steeringWheel;
+    this.speedNeedle = cockpit.speedNeedle;
+    this.tachNeedle = cockpit.tachNeedle;
     this.group.add(this.exterior, this.cockpit);
     this.cockpit.visible = false;
     scene.add(this.group);
@@ -136,6 +155,9 @@ export class RaycastVehicle {
     );
 
     // Low centre of mass keeps the blocky chassis from tripping over itself.
+    // W4 #23: contact-force events on the chassis are the damage source. The
+    // suspension is raycast-based, so a chassis contact really is a crash or a
+    // hard landing, not normal driving.
     this.chassisCollider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(CHASSIS_HALF_WIDTH, CHASSIS_HALF_HEIGHT, CHASSIS_HALF_LENGTH)
         .setMassProperties(
@@ -145,7 +167,9 @@ export class RaycastVehicle {
           { x: 0, y: 0, z: 0, w: 1 },
         )
         .setFriction(0.5)
-        .setRestitution(0.05),
+        .setRestitution(0.05)
+        .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+        .setContactForceEventThreshold(VEHICLE_HEALTH.impactForceThreshold),
       this.body,
     );
 
@@ -245,6 +269,56 @@ export class RaycastVehicle {
     return CHASSIS_MASS;
   }
 
+  /** W4 #23: 0..100 current vehicle condition. */
+  get healthValue(): number {
+    return this.health;
+  }
+
+  /** Multiplier on engine torque from crash damage (1 while healthy). */
+  get damagePowerFactor(): number {
+    return powerFactorFor(this.health);
+  }
+
+  /** Multiplier on steering angle from crash damage (1 while healthy). */
+  get damageSteerFactor(): number {
+    return steerFactorFor(this.health);
+  }
+
+  /** 1 right after a hit, decaying over ~0.8 s for the HUD flash. */
+  get damageFlashLevel(): number {
+    return this.damageFlash;
+  }
+
+  /** W4 #23: apply crash damage; returns the health actually lost. */
+  applyDamage(amount: number): number {
+    const before = this.health;
+    this.health = applyDamage(this.health, amount);
+    const lost = before - this.health;
+    if (lost > 0) this.damageFlash = 1;
+    return lost;
+  }
+
+  /** W4 #23: repair kit heals up to the 100 cap; returns the health restored. */
+  repairHealth(amount: number): number {
+    const before = this.health;
+    this.health = applyRepair(this.health, amount);
+    return this.health - before;
+  }
+
+  /** W5 #22: restore a checkpoint's condition without a repair animation. */
+  restoreHealth(value: number): void {
+    this.health = clamp(value, 0, VEHICLE_HEALTH.max);
+  }
+
+  /** W5 #20: 0 = dry, 1 = fully soaked; scales both tire friction terms. */
+  setWetness(value: number): void {
+    this.wetness = clamp(value, 0, 1);
+  }
+
+  get wetnessValue(): number {
+    return this.wetness;
+  }
+
   get rigidBody(): RAPIER.RigidBody {
     return this.body;
   }
@@ -277,7 +351,60 @@ export class RaycastVehicle {
     this.winchLoad = clamp(load, 0, 1.5);
   }
 
-  /** W3 #20: temporary righting action until the W4 jack exists. */
+  /** W4 #22: start a hydraulic-jack lift; remember the pose to animate from. */
+  beginJack(): void {
+    const t = this.body.translation();
+    const q = this.body.rotation();
+    this.jackStartPosition.set(t.x, t.y, t.z);
+    this.jackStartRotation.set(q.x, q.y, q.z, q.w);
+    this.jacking = true;
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  /**
+   * W4 #22: animate the chassis from its rolled pose to upright over the jack
+   * progress (0..1). The body is moved directly and its velocity zeroed so the
+   * lift reads as a hydraulic jack rather than a physics bounce.
+   */
+  applyJackProgress(progress: number): void {
+    if (!this.jacking) return;
+    const t = clamp(progress, 0, 1);
+    const eased = t * t * (3 - 2 * t);
+    const forward = new THREE.Vector3(0, 0, 1)
+      .applyQuaternion(this.jackStartRotation);
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-4) forward.set(0, 0, 1);
+    forward.normalize();
+    const yaw = Math.atan2(forward.x, forward.z);
+    const upright = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      yaw,
+    );
+    const rotation = this.jackStartRotation.clone().slerp(upright, eased);
+    const lift = 0.45 * Math.sin(Math.PI * Math.min(1, t));
+    this.body.setTranslation(
+      {
+        x: this.jackStartPosition.x,
+        y: this.jackStartPosition.y + lift,
+        z: this.jackStartPosition.z,
+      },
+      true,
+    );
+    this.body.setRotation(
+      { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w },
+      true,
+    );
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  /** Finish or abort the jack animation; the car settles on its wheels. */
+  endJack(): void {
+    this.jacking = false;
+  }
+
+  /** W3 #20: righting action used at the end of the W4 jack animation. */
   rightAtCurrent(): void {
     const t = this.body.translation();
     const q = this.body.rotation();
@@ -286,7 +413,9 @@ export class RaycastVehicle {
     );
     const yaw = Math.atan2(forward.x, forward.z);
     const upright = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-    this.body.setTranslation({ x: t.x, y: Math.max(t.y + 1, 1.4), z: t.z }, true);
+    // The W4 jack animation already lifted the body; settle from its current
+    // height instead of teleporting a metre up (that read as a hop).
+    this.body.setTranslation({ x: t.x, y: Math.max(t.y, 1.0), z: t.z }, true);
     this.body.setRotation(
       { x: upright.x, y: upright.y, z: upright.z, w: upright.w },
       true,
@@ -317,6 +446,7 @@ export class RaycastVehicle {
     const velocity = this.body.linvel();
     const speed = velocity.x * chassisForward.x + velocity.y * chassisForward.y + velocity.z * chassisForward.z;
     this.updateReverse(dt, input, speed);
+    this.damageFlash = Math.max(0, this.damageFlash - dt * 1.4);
 
     // W2 #7 / issue #13: deep water (> 50 cm) floods the intake; power drops
     // 40 % and recovers over 10 s once the car is back on dry ground.
@@ -349,6 +479,7 @@ export class RaycastVehicle {
         -input.brake *
           REVERSE_FORCE *
           powerFactor *
+          this.damagePowerFactor *
           this.winchAssist *
           clamp((REVERSE_MAX_SPEED - reverseSpeed) / 0.6, 0, 1) +
         // A light governor keeps a downhill roll from running away past the
@@ -362,6 +493,7 @@ export class RaycastVehicle {
         ENGINE_FORCE *
         torqueFactor *
         powerFactor *
+        this.damagePowerFactor *
         this.winchAssist *
         clamp((gearMax - Math.max(0, speed)) / 0.6, 0, 1);
     }
@@ -420,6 +552,10 @@ export class RaycastVehicle {
     }
 
     this.steeringWheel.rotation.z = -this.lastSteer * 1.8;
+    const speedNorm = clamp(Math.abs(this.forwardSpeed) * 3.6 / 100, 0, 1);
+    this.speedNeedle.rotation.z = -2.1 + speedNorm * 4.2;
+    const tachNorm = clamp(Math.abs(this.forwardSpeed) * 3.6 / 90, 0, 1);
+    this.tachNeedle.rotation.z = -2.1 + tachNorm * 4.2;
 
     // W3 #19: a loaded rope pulls the body down a few centimetres; the wheels
     // stay on their suspension rays so the ride height does not lie.
@@ -434,6 +570,8 @@ export class RaycastVehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.drivetrain.reset();
     this.disengageReverse();
+    this.damageFlash = 0;
+    this.jacking = false;
     this.forwardSpeed = 0;
     this.lastSteer = 0;
     this.waterIngressLevel = 0;
@@ -554,7 +692,9 @@ export class RaycastVehicle {
       }
     }
 
-    state.steerAngle = config.steer ? -input.steer * MAX_STEER : 0;
+    state.steerAngle = config.steer
+      ? -input.steer * MAX_STEER * this.damageSteerFactor
+      : 0;
 
     if (!Number.isFinite(closestDistance)) {
       state.grounded = false;
@@ -619,8 +759,13 @@ export class RaycastVehicle {
       contactVelocity.z * wheelRight.z;
 
     const contactSlip = Math.hypot(longSpeed, latSpeed);
+    const weatherGrip = weatherGripMultiplier(surface, this.wetness);
     const maxFrictionImpulse =
-      surface.friction * gripCurve(contactSlip) * Math.max(springForce, 300) * dt;
+      surface.friction *
+      weatherGrip *
+      gripCurve(contactSlip) *
+      Math.max(springForce, 300) *
+      dt;
     let longitudinal = config.drive ? driveForce : 0;
     const gravityAlong = -9.81 * wheelForward.y;
 
@@ -661,7 +806,7 @@ export class RaycastVehicle {
     );
 
     const lateralImpulse = clamp(
-      -latSpeed * (CHASSIS_MASS / 4) * LATERAL_GRIP * surface.lateralGrip * dt,
+      -latSpeed * (CHASSIS_MASS / 4) * LATERAL_GRIP * surface.lateralGrip * weatherGrip * dt,
       -maxFrictionImpulse,
       maxFrictionImpulse,
     );
@@ -770,84 +915,241 @@ export class RaycastVehicle {
     }
   }
 
-  private buildCockpit(): THREE.Group {
-    const dark = new THREE.MeshStandardMaterial({ color: 0x1d2328, roughness: 0.9 });
-    const trim = new THREE.MeshStandardMaterial({ color: 0x3b444b, roughness: 0.75 });
-    const accent = new THREE.MeshStandardMaterial({ color: 0xc9d1c2, roughness: 0.6 });
+  /**
+   * W5 #19 / issue #25: cockpit interior v0.
+   *
+   * The blockout keeps the W1 camera proportions and adds a low-poly interior
+   * that reads from the driver's eye: dashboard with two live gauges, a spoked
+   * wheel, driver/passenger seats, door panels and armrests, A-pillars, sun
+   * visors, a rear-view mirror and side mirrors, plus the hood/fender blockout
+   * that keeps the road visible. All interior dimensions are local to the same
+   * chassis used by the exterior (body 1.8 x 4.0 m, cabin 1.5 m wide).
+   */
+  private buildCockpit(): {
+    steeringWheel: THREE.Group;
+    speedNeedle: THREE.Object3D;
+    tachNeedle: THREE.Object3D;
+  } {
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2a3138, roughness: 0.9 });
+    const soft = new THREE.MeshStandardMaterial({ color: 0x434d54, roughness: 0.82 });
+    const trim = new THREE.MeshStandardMaterial({
+      color: 0x5d666e,
+      roughness: 0.45,
+      metalness: 0.45,
+    });
+    const fabric = new THREE.MeshStandardMaterial({ color: 0x46524a, roughness: 0.96 });
+    const accent = new THREE.MeshStandardMaterial({ color: 0xd8c9a2, roughness: 0.55 });
+    const gaugeFace = new THREE.MeshStandardMaterial({
+      color: 0x10161a,
+      emissive: 0x2a5048,
+      emissiveIntensity: 1.1,
+      roughness: 0.35,
+    });
+    const needleMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffb060,
+      emissive: 0xff7a20,
+      emissiveIntensity: 1.5,
+      roughness: 0.4,
+    });
+    const mirrorGlass = new THREE.MeshStandardMaterial({
+      color: 0xc0d0d8,
+      roughness: 0.15,
+      metalness: 0.4,
+    });
+    const leather = new THREE.MeshStandardMaterial({ color: 0x23282c, roughness: 0.72 });
 
-    const dashboard = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 0.42), dark);
-    dashboard.position.set(0, 0.12, 0.98);
-    this.cockpit.add(dashboard);
+    const add = (
+      mesh: THREE.Mesh,
+      x: number,
+      y: number,
+      z: number,
+      rx = 0,
+      ry = 0,
+      rz = 0,
+    ): THREE.Mesh => {
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(rx, ry, rz);
+      this.cockpit.add(mesh);
+      return mesh;
+    };
+    const box = (
+      width: number,
+      height: number,
+      depth: number,
+      x: number,
+      y: number,
+      z: number,
+      material: THREE.Material,
+      rx = 0,
+      ry = 0,
+      rz = 0,
+    ): THREE.Mesh => add(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material), x, y, z, rx, ry, rz);
 
-    const cluster = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.15, 0.06), trim);
-    cluster.position.set(-0.32, 0.26, 0.8);
-    this.cockpit.add(cluster);
+    // Floor and dashboard. The dash top stays below the eye line so the road
+    // remains visible; the binnacle carries the gauges above the wheel rim.
+    box(1.45, 0.06, 1.8, 0, -0.16, 0.05, dark);
+    box(1.48, 0.22, 0.45, 0, 0.1, 0.98, soft);
+    box(1.48, 0.06, 0.12, 0, 0.23, 0.82, dark);
+    box(1.48, 0.16, 0.1, 0, -0.02, 0.8, dark);
+    box(0.3, 0.3, 0.16, 0.18, 0.06, 0.9, dark);
+    box(0.26, 0.04, 0.3, 0.18, 0.15, 0.9, trim);
+    for (const x of [-0.5, 0.5]) {
+      box(0.13, 0.06, 0.02, x, 0.2, 0.8, trim);
+      for (let slat = -1; slat <= 1; slat += 1) {
+        box(0.11, 0.012, 0.012, x, 0.2 + slat * 0.018, 0.786, dark);
+      }
+    }
 
-    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.28, 10), trim);
-    column.position.set(-0.32, 0.24, 0.76);
-    column.rotation.x = Math.PI / 2 - 0.45;
-    this.cockpit.add(column);
+    // Instrument binnacle: two gauge faces with tick marks and live needles.
+    box(0.52, 0.2, 0.12, -0.32, 0.4, 0.83, dark);
+    box(0.54, 0.03, 0.14, -0.32, 0.51, 0.82, trim);
+    const gaugeCenters: Array<[number, number]> = [
+      [-0.44, 0.42],
+      [-0.2, 0.42],
+    ];
+    for (const [x, y] of gaugeCenters) {
+      const face = new THREE.Mesh(new THREE.CircleGeometry(0.062, 24), gaugeFace);
+      add(face, x, y, 0.766, 0, Math.PI, 0);
+      const rim = new THREE.Mesh(new THREE.RingGeometry(0.062, 0.075, 24), trim);
+      add(rim, x, y, 0.765, 0, Math.PI, 0);
+      for (let tick = 0; tick < 7; tick += 1) {
+        const angle = -2.2 + (tick / 6) * 4.4;
+        const mark = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.018, 0.006), trim);
+        add(
+          mark,
+          x + Math.sin(angle) * 0.052,
+          y + Math.cos(angle) * 0.052,
+          0.764,
+          0,
+          Math.PI,
+          -angle,
+        );
+      }
+    }
+    const needle = (): THREE.Object3D => {
+      const group = new THREE.Group();
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.011, 0.1, 0.008), needleMaterial);
+      blade.geometry.translate(0, 0.045, 0);
+      group.add(blade);
+      this.cockpit.add(group);
+      return group;
+    };
+    const speedNeedle = needle();
+    speedNeedle.position.set(-0.44, 0.42, 0.76);
+    const tachNeedle = needle();
+    tachNeedle.position.set(-0.2, 0.42, 0.76);
+
+    // A soft warm cabin light: without it the blockout reads as a black hole
+    // at dusk even though the exterior is lit correctly.
+    const cabinLight = new THREE.PointLight(0xffd2a0, 0.9, 3.2, 1.6);
+    cabinLight.position.set(0, 0.36, 0.5);
+    this.cockpit.add(cabinLight);
+
+    // Steering column + wheel with three spokes.
+    const column = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.036, 0.04, 0.3, 12),
+      trim,
+    );
+    add(column, -0.32, 0.18, 0.79, Math.PI / 2 - 0.42, 0, 0);
 
     const steeringWheel = new THREE.Group();
-    steeringWheel.position.set(-0.32, 0.3, 0.72);
-    steeringWheel.rotation.x = -0.45;
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.024, 8, 24), accent);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 12), dark);
+    steeringWheel.position.set(-0.32, 0.25, 0.73);
+    steeringWheel.rotation.x = -0.42;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.02, 10, 28), leather);
+    steeringWheel.add(rim);
+    for (const x of [-0.068, 0.068]) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.018, 0.018), trim);
+      spoke.position.set(x, 0, 0);
+      steeringWheel.add(spoke);
+    }
+    const lowerSpoke = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.09, 0.018), trim);
+    lowerSpoke.position.set(0, -0.062, 0);
+    steeringWheel.add(lowerSpoke);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.045, 16), dark);
     hub.rotation.x = Math.PI / 2;
-    steeringWheel.add(rim, hub);
+    steeringWheel.add(hub);
+    const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.012, 12), accent);
+    badge.rotation.x = Math.PI / 2;
+    badge.position.z = 0.026;
+    steeringWheel.add(badge);
     this.cockpit.add(steeringWheel);
 
-    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), trim);
-    seatBase.position.set(-0.32, -0.02, -0.2);
-    this.cockpit.add(seatBase);
-    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.12), trim);
-    seatBack.position.set(-0.32, 0.22, -0.45);
-    seatBack.rotation.x = -0.12;
-    this.cockpit.add(seatBack);
+    // Centre console and transfer lever.
+    box(0.28, 0.2, 0.72, 0.2, 0.02, 0.38, soft);
+    box(0.26, 0.03, 0.52, 0.2, 0.13, 0.38, trim);
+    const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.18, 8), trim);
+    add(lever, 0.2, 0.22, 0.48, 0.18, 0, 0);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), dark);
+    add(knob, 0.2, 0.31, 0.49);
 
-    for (const x of [-0.78, 0.78]) {
-      const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 1.4), dark);
-      doorPanel.position.set(x, 0.12, 0.02);
-      this.cockpit.add(doorPanel);
+    // Seats. The driver seat centre matches the wheel centre and the camera eye.
+    const seat = (x: number): void => {
+      box(0.5, 0.12, 0.5, x, -0.03, -0.15, fabric);
+      box(0.08, 0.14, 0.5, x - 0.27, 0.02, -0.15, fabric);
+      box(0.08, 0.14, 0.5, x + 0.27, 0.02, -0.15, fabric);
+      box(0.48, 0.55, 0.12, x, 0.22, -0.42, fabric, -0.12, 0, 0);
+      box(0.07, 0.5, 0.14, x - 0.24, 0.24, -0.42, fabric, -0.12, 0, 0);
+      box(0.07, 0.5, 0.14, x + 0.24, 0.24, -0.42, fabric, -0.12, 0, 0);
+      box(0.26, 0.18, 0.12, x, 0.55, -0.43, fabric, -0.12, 0, 0);
+      box(0.035, 0.46, 0.02, x, 0.23, -0.36, dark, -0.12, 0, 0.22);
+    };
+    seat(-0.32);
+    seat(0.45);
+
+    // Door panels, armrests and sills.
+    for (const side of [-1, 1]) {
+      const x = side * 0.72;
+      box(0.07, 0.38, 1.45, x, 0.1, 0, dark);
+      box(0.1, 0.07, 0.68, side * 0.65, -0.02, 0.12, soft);
+      box(0.08, 0.06, 1.4, x, 0.35, 0, trim);
+      box(0.04, 0.04, 0.18, side * 0.66, 0.22, 0.45, trim);
+      box(0.04, 0.28, 0.04, side * 0.74, 0.18, -0.7, dark);
     }
 
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.36, 0.06, 1.7), dark);
-    roof.position.set(0, 0.7, -0.1);
-    this.cockpit.add(roof);
-
-    for (const x of [-0.62, 0.62]) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), trim);
-      pillar.position.set(x, 0.5, 0.85);
-      pillar.rotation.z = x > 0 ? -0.12 : 0.12;
-      this.cockpit.add(pillar);
+    // Roof, A-pillars (leaning inward), header and sun visors.
+    box(1.4, 0.06, 1.75, 0, 0.76, -0.05, soft);
+    for (const x of [-0.64, 0.64]) {
+      box(0.07, 0.64, 0.07, x, 0.49, 0.84, trim, 0, 0, x > 0 ? 0.12 : -0.12);
+    }
+    box(1.3, 0.08, 0.08, 0, 0.78, 0.84, trim);
+    for (const x of [-0.35, 0.35]) {
+      box(0.44, 0.02, 0.12, x, 0.75, 0.75, soft, 0.12, 0, 0);
     }
 
-    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.04), dark);
-    mirror.position.set(0, 0.65, 0.76);
-    this.cockpit.add(mirror);
+    // Rear-view mirror and compact side mirrors.
+    box(0.22, 0.07, 0.04, 0, 0.73, 0.64, dark);
+    const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.05), mirrorGlass);
+    add(rearGlass, 0, 0.73, 0.619, 0, Math.PI, 0);
+    box(0.02, 0.12, 0.02, 0, 0.78, 0.68, dark, 0.3, 0, 0);
+    for (const side of [-1, 1]) {
+      const x = side * 0.86;
+      box(0.1, 0.06, 0.035, x, 0.52, 0.8, dark);
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.075, 0.04), mirrorGlass);
+      add(glass, x, 0.52, 0.781, 0, Math.PI, 0);
+      box(0.03, 0.02, 0.1, side * 0.8, 0.51, 0.83, trim);
+    }
 
-    // A hood/fender blockout beyond the dashboard: the exterior body is hidden
-    // in the cabin camera, so this keeps the engine cover visible through the glass.
+    // Hood/fender blockout beyond the dashboard: the exterior is hidden in the
+    // cabin camera, so this keeps the engine cover visible through the glass.
     const paint = new THREE.MeshStandardMaterial({
       color: 0xd95f2b,
       roughness: 0.55,
       metalness: 0.12,
     });
-    const hood = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, 1.3), paint);
-    hood.position.set(0, 0.06, 1.55);
-    this.cockpit.add(hood);
+    box(1.7, 0.1, 1.3, 0, 0.06, 1.55, paint);
     for (const x of [-0.8, 0.8]) {
-      const fender = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 1.4), paint);
-      fender.position.set(x, 0.02, 1.5);
-      this.cockpit.add(fender);
+      box(0.16, 0.3, 1.4, x, 0.02, 1.5, paint);
     }
-    const frontBody = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 0.6, 1.3),
+    box(
+      1.7,
+      0.6,
+      1.3,
+      0,
+      -0.2,
+      1.55,
       new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 }),
     );
-    frontBody.position.set(0, -0.2, 1.55);
-    this.cockpit.add(frontBody);
 
-    return steeringWheel;
+    return { steeringWheel, speedNeedle, tachNeedle };
   }
 }
