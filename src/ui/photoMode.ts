@@ -7,6 +7,8 @@ export interface PhotoModeOptions {
   postFx: PostFx;
   onShutter: () => void;
   onNotice: (text: string, tone?: 'info' | 'ok' | 'warn') => void;
+  /** Mission hook: the captured PNG (data URL) and its pixel size. */
+  onCapture?: (dataUrl: string, width: number, height: number) => void;
 }
 
 /**
@@ -122,6 +124,7 @@ export class PhotoMode {
     document.body.appendChild(link);
     link.click();
     link.remove();
+    this.options.onCapture?.(dataUrl, size.width, size.height);
     this.options.onNotice(`照片已保存 · ${size.width}×${size.height}`, 'ok');
     return dataUrl;
   }

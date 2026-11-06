@@ -1,12 +1,16 @@
-# superagent｜越野灰盒原型（W5 相机 / 昼夜 / 存档 build）
+# superagent｜越野灰盒原型（W5 + 第一趟任务 build）
 
-“一辆车、一段烂路、一根绞盘”的越野灰盒原型。W1 目标：**能开**；W2：**路有差别**；W3：**绞盘自救**；W4：**四件工具**；W5：**像那么回事**——相机与拍照、昼夜天气、后期调色、木屋检查点存档、60 秒录屏脚本。
+“一辆车、一段烂路、一根绞盘”的越野灰盒原型。W1 目标：**能开**；W2：**路有差别**；W3：**绞盘自救**；W4：**四件工具**；W5：**像那么回事**——相机与拍照、昼夜天气、后期调色、木屋检查点存档、60 秒录屏脚本；W5 之后的第一个 directed mission：**第一趟**（10–20 分钟，从木屋出生点到山脊再回木屋）。
 
 当前版本是 three.js + Rapier 的浏览器可玩构建，不需要安装游戏引擎。
 
 ![W5 出生点 HUD](docs/images/w5-after-spawn.png)
 
 ![W5 座舱内饰 v0](docs/images/w5-after-cockpit.png)
+
+![第一趟任务介绍](docs/images/first-run-intro.png)
+
+![第一趟完成：用时与山脊照片](docs/images/first-run-complete.png)
 
 [W5 60 秒录屏（固定机位 + 时间加速 + 夜雨）](docs/w5-60s.mp4)
 
@@ -37,7 +41,7 @@
 | Q / E 或 手柄 LB / RB | L 档 / H 档（0.3 s 动力中断） |
 | C 或 手柄 Y | 切换第三人称 / 自由 / 座舱 |
 | Space 或 手柄 A | 手刹（坡起不溜车） |
-| R 或 手柄 Start | 复位到起点（不覆盖检查点） |
+| R 或 手柄 Start | 复位到起点（不覆盖检查点；第一趟进行中不会重置任务进度） |
 | 鼠标右键拖动 | 自由 / 座舱视角环视 |
 | 滚轮 | 相机距离；拍照模式下是 FOV 24–200 |
 | P | 进入 / 退出拍照模式（HUD 自动隐藏） |
@@ -47,6 +51,8 @@
 | N | 时间加速 ×8（再按恢复） |
 | B | 天气：晴 → 雨 → 雾 |
 | Esc | 手柄死区、转向灵敏度、FOV、一游戏日时长设置 |
+| Enter / 点击「开始第一趟」 | 从任务介绍卡开始第一趟；驾驶输入也会自动开始 |
+| 第一趟任务卡「重开」 | 回到起点、车况 100、木板/维修包重置，任务从目标 1 重开 |
 
 ## W5 已实现（#19–#23 / issue #25–#29）
 
@@ -55,6 +61,13 @@
 - **后期与调色 v0**（#21 / issue #27）：EffectComposer 固定管线（轻景深 → 胶片颗粒/暗角/冷阴影暖高光 → 输出），一套参数定死；拍照模式只叠加 4 个滤镜，不改变游戏内风格。**注意**：W5 文档要求与 3 张目标图比对，但目标图在 `docs/production-plan.md` 中属 P2 产出，仓库当前没有，因此调色观感仍待人工验收。
 - **存档与检查点 v0**（#22 / issue #28）：木屋检查点自动保存车辆位置/朝向、车况、工具库存、已发现目标、时刻与天气；强退/刷新后回到木屋，装备不丢。山脊观景点、木屋、起手绞盘练习共 3 个发现目标。设置面板可清除存档。
 - **60 秒录屏脚本**（#23 / issue #29）：`npm run record` 使用 5 个固定机位 + ×8 时间加速 + 晴/雨/雾，录制 canvas 并转成 1080p60 H.264。
+
+### 第一趟 directed mission（W5 之后）
+
+- 新增 5 段式任务：架桥过 2 m 沟 → 侧翻/撞伤后恢复 → 绞盘自救 → 山脊观景点拍照 → 回木屋完成并保存。
+- 任务卡常驻右上角，显示计时、当前目标、提示与 5 步清单；完成页显示用时、山脊照片与「再跑一趟 / 自由驾驶」。
+- 任务进度写进 W5 木屋检查点存档（v1 可选字段，旧存档仍可读）；刷新后从木屋继续当前目标，完成后可重开。
+- 验收步骤、路线坐标与截图见 [`docs/mission-first-run.md`](docs/mission-first-run.md)；一键键盘路径预检：`npm run verify:mission`。
 
 W5 验收、命令与待人工项见 [`docs/w5-acceptance.md`](docs/w5-acceptance.md)。W1–W4 的验收记录见 [`docs/w1-acceptance.md`](docs/w1-acceptance.md)、[`docs/w2-acceptance.md`](docs/w2-acceptance.md)、[`docs/w3-acceptance.md`](docs/w3-acceptance.md)、[`docs/w4-acceptance.md`](docs/w4-acceptance.md)。
 
@@ -76,6 +89,7 @@ W5 验收、命令与待人工项见 [`docs/w5-acceptance.md`](docs/w5-acceptanc
 | `npm test` | Vitest 单元测试 |
 | `npm run typecheck` | TypeScript 检查 |
 | `npm run record` | 构建并录制 `docs/w5-60s.mp4`（1080p60） |
+| `npm run verify:mission` | 构建并以真实键盘路径验收第一趟（Chrome GPU，输出 `docs/images/first-run-*.png`） |
 
 ## 目录
 
@@ -84,6 +98,7 @@ src/
   core/       # 固定步长、输入、渲染、后期、昼夜/天气、存档、录屏脚本、音频
   vehicle/    # 8 射线悬挂车辆、两档变速箱、相机与座舱内饰
   terrain/    # 800×800 白盒测试场、路面材质、木屋/观景点、绞盘课程
+  mission/    # 第一趟任务状态机、目标顺序与触发区（纯逻辑）
   tools/      # 绞盘、木板、千斤顶、维修包、库存
   ui/         # HUD、工具轮盘、绞盘 HUD、拍照 UI、设置
   world/      # 天空/太阳/雾/雨/车灯环境

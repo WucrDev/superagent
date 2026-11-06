@@ -21,10 +21,12 @@ import { WEATHER_LABELS, type WeatherKind } from './core/weather';
 import { Landmarks } from './terrain/landmarks';
 import { createTestTrack } from './terrain/testTrack';
 import { createWinchCourse } from './terrain/winchCourse';
+import { FirstRunMission, formatRunTime, inWinchRecoveryZone } from './mission/firstRun';
 import { TOOL_ORDER } from './tools/inventory';
 import { Toolkit } from './tools/toolkit';
 import { Winch } from './tools/winch';
 import { Hud } from './ui/hud';
+import { MissionHud } from './ui/missionHud';
 import { PhotoMode } from './ui/photoMode';
 import { SettingsPanel } from './ui/settingsPanel';
 import { ToolHud } from './ui/toolHud';
@@ -52,6 +54,7 @@ declare global {
       postFx: PostFx;
       photo: PhotoMode;
       worldHud: WorldHud;
+      mission: FirstRunMission;
       loop: GameLoop;
       camera: THREE.PerspectiveCamera;
       teleport: (x: number, z: number, yaw?: number) => void;
@@ -133,6 +136,18 @@ async function boot(): Promise<void> {
       haptics,
       hud: winchHud,
     });
+    const mission = new FirstRunMission();
+    let missionPhoto: string | null = null;
+    let missionWinchArmed = false;
+    let missionWinchDistance = 0;
+    let missionLastX = 0;
+    let missionLastZ = 0;
+    const missionHud = new MissionHud({
+      onStart: () => startFirstRun(),
+      onRestart: () => restartFirstRun(),
+      onReplay: () => restartFirstRun(),
+      onFree: () => missionHud.hideComplete(),
+    });
     let toolkit: Toolkit | null = null;
     const toolHud = new ToolHud((index) => toolkit?.inventory.select(index));
     toolkit = new Toolkit(scene, world, car, track, {
@@ -140,6 +155,18 @@ async function boot(): Promise<void> {
       effects,
       haptics,
       hud: toolHud,
+      onPlankPlaced: (x, z) => {
+        mission.plankPlaced(x, z);
+        syncMission();
+      },
+      onJackDone: () => {
+        mission.recovered('jack', car.position.x, car.position.z);
+        syncMission();
+      },
+      onRepairDone: () => {
+        mission.recovered('repair', car.position.x, car.position.z);
+        syncMission();
+      },
     });
     const tools = toolkit;
     new SettingsPanel(input, cameraRig, environment);
@@ -149,6 +176,12 @@ async function boot(): Promise<void> {
       postFx,
       onShutter: () => audio.cameraShutter(),
       onNotice: (text, tone) => worldHud.notice(text, tone ?? 'info'),
+      onCapture: (dataUrl) => {
+        missionPhoto = dataUrl;
+        const position = car.position;
+        mission.photoCaptured(position.x, position.z);
+        syncMission();
+      },
     });
     const demo = recordMode ? new RecordDemo(renderer.domElement, car, environment) : null;
     if (demo) {
@@ -161,7 +194,9 @@ async function boot(): Promise<void> {
       window.__recordChunk = (offset, length) => demo.chunk(offset, length);
     }
 
-    const saveCheckpoint = (source: 'checkpoint' | 'discovery'): SaveData | null => {
+    const saveCheckpoint = (
+      source: 'checkpoint' | 'discovery' | 'mission',
+    ): SaveData | null => {
       const checkpoint = landmarks.checkpoint;
       const inventory: SavedInventory = {
         winch: tools.inventory.count('winch'),
@@ -180,6 +215,7 @@ async function boot(): Promise<void> {
         discovered: landmarks.discoveredIds,
         hours: environment.currentHours,
         weather: environment.weather,
+        mission: mission.toSave(),
       });
       if (!writeSave(localStorage, data)) {
         worldHud.notice('检查点保存失败：浏览器存储不可用', 'warn', 5);
@@ -202,11 +238,18 @@ async function boot(): Promise<void> {
         tools.inventory.setCount(kind, data.inventory[kind]);
       }
       landmarks.restore(data.discovered);
+      mission.restore(data.mission);
       environment.setHours(data.hours);
       environment.setWeatherInstant(data.weather);
       landmarks.update(data.x, data.z);
+      const missionSuffix =
+        mission.status === 'active'
+          ? ` · 第一趟目标 ${mission.objectiveIndex + 1}/5`
+          : mission.status === 'complete'
+            ? ' · 第一趟已完成'
+            : '';
       worldHud.notice(
-        `已从${data.checkpointLabel}继续 · 车况 ${Math.round(data.health)} · 木板 ${data.inventory.plank} · 维修包 ${data.inventory.repair} · 发现 ${landmarks.discoveredCount}/${landmarks.totalPois}`,
+        `已从${data.checkpointLabel}继续 · 车况 ${Math.round(data.health)} · 木板 ${data.inventory.plank} · 维修包 ${data.inventory.repair} · 发现 ${landmarks.discoveredCount}/${landmarks.totalPois}${missionSuffix}`,
         'ok',
         6,
       );
@@ -214,6 +257,111 @@ async function boot(): Promise<void> {
 
     const saved = loadSave(localStorage);
     if (saved) applySave(saved);
+    const bootMission = mission.snapshot;
+    if (bootMission.status === 'idle') {
+      missionHud.showIntro(bootMission);
+    } else if (bootMission.status === 'active') {
+      worldHud.notice(
+        `继续第一趟 · 目标 ${bootMission.objectiveIndex + 1}/5 · ${bootMission.objective.title}`,
+        'ok',
+        6,
+      );
+    } else {
+      worldHud.notice(
+        `第一趟已完成 · 最佳 ${formatRunTime(bootMission.bestMs ?? bootMission.elapsedMs)} · 任务卡「重开」可以再跑`,
+        'ok',
+        6,
+      );
+    }
+
+    function syncMission(): void {
+      for (const event of mission.drainEvents()) {
+        if (event.type === 'started') {
+          worldHud.notice('第一趟开始 · 目标 1/5 · 架桥过沟', 'ok', 5);
+          saveCheckpoint('mission');
+        } else if (event.type === 'restarted') {
+          worldHud.notice('第一趟重新开始 · 已回到起点，装备已重置', 'info', 4);
+          saveCheckpoint('mission');
+        } else if (event.type === 'objective-complete') {
+          worldHud.notice(
+            `第一趟 · 完成目标 ${event.index + 1}/5：${event.objective.label}`,
+            'ok',
+            4.5,
+          );
+          saveCheckpoint('mission');
+        } else if (event.type === 'complete') {
+          worldHud.notice(
+            `第一趟完成 · ${formatRunTime(event.elapsedMs)} · 已保存到木屋检查点`,
+            'ok',
+            8,
+          );
+          saveCheckpoint('mission');
+          missionHud.showComplete(mission.snapshot, missionPhoto);
+        }
+      }
+      missionHud.update(mission.snapshot);
+    }
+
+    function startFirstRun(): void {
+      if (mission.status === 'complete') {
+        restartFirstRun();
+        return;
+      }
+      if (mission.status === 'active') {
+        missionHud.hideIntro();
+        return;
+      }
+      mission.start();
+      missionHud.hideIntro();
+      syncMission();
+    }
+
+    /** Mission restart: back to the start gate with a fresh loadout and boards. */
+    function restartFirstRun(): void {
+      missionHud.hideIntro();
+      missionHud.hideComplete();
+      photo.exit();
+      mission.restart();
+      missionPhoto = null;
+      car.reset();
+      car.restoreHealth(100);
+      tools.resetRun();
+      winch.reset();
+      missionWinchArmed = false;
+      missionWinchDistance = 0;
+      missionLastX = car.position.x;
+      missionLastZ = car.position.z;
+      syncMission();
+      missionHud.update(mission.snapshot);
+    }
+
+    /** Accumulate real reeling displacement and credit a recovery in-zone. */
+    function updateWinchRecovery(): void {
+      const x = car.position.x;
+      const z = car.position.z;
+      const snapshot = winch.snapshot;
+      const reeling = snapshot.attached !== null && snapshot.reeling;
+      if (reeling) {
+        if (!missionWinchArmed && inWinchRecoveryZone(x, z)) {
+          missionWinchArmed = true;
+          missionWinchDistance = 0;
+        }
+        missionWinchDistance += Math.hypot(x - missionLastX, z - missionLastZ);
+        if (
+          missionWinchArmed &&
+          missionWinchDistance >= 1.2 &&
+          mission.winchRecovered(x, z)
+        ) {
+          missionWinchArmed = false;
+          syncMission();
+        }
+      } else {
+        missionWinchArmed = false;
+        missionWinchDistance = 0;
+      }
+      missionLastX = x;
+      missionLastZ = z;
+    }
 
     const IDLE_DRIVE = {
       throttle: 0,
@@ -324,6 +472,8 @@ async function boot(): Promise<void> {
           worldHud.notice(`天气：${WEATHER_LABELS[kind]}`, 'info', 2.2);
         }
         worldHud.tick(step);
+        mission.tick(step, car.position.x, car.position.z);
+        syncMission();
 
         if (photo.isActive) {
           photo.handle(worldInput);
@@ -333,6 +483,12 @@ async function boot(): Promise<void> {
         }
 
         const raw = input.sample();
+        if (
+          mission.status === 'idle' &&
+          (raw.throttle > 0.05 || raw.brake > 0.05 || Math.abs(raw.steer) > 0.05)
+        ) {
+          startFirstRun();
+        }
         const toolInput = input.sampleTools();
         if (reverseHeld) raw.brake = 1;
         lastThrottle = raw.throttle;
@@ -381,6 +537,7 @@ async function boot(): Promise<void> {
         world.step(eventQueue);
         tools.handleContactEvents(eventQueue);
         car.sync(step);
+        updateWinchRecovery();
 
         const position = car.position;
         const landmarkTick = landmarks.update(position.x, position.z);
@@ -422,6 +579,7 @@ async function boot(): Promise<void> {
           track.waterAt(car.position.x, car.position.z)?.depth ?? 0,
         );
         worldHud.update(environment.snapshot, landmarks.discoveredCount, landmarks.totalPois);
+        missionHud.update(mission.snapshot);
         photo.sync();
         audio.update(car.speedKmh, lastThrottle, car.gear);
         audio.setRain(environment.rainIntensity);
@@ -467,6 +625,7 @@ async function boot(): Promise<void> {
       postFx,
       photo,
       worldHud,
+      mission,
       loop,
       camera,
       teleport: (x, z, yaw = 0) => car.place(x, z, yaw),

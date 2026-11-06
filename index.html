@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b0f0b" />
+    <link rel="icon" href="data:," />
     <title>Superagent · 越野灰盒原型</title>
   </head>
   <body>
@@ -37,15 +38,58 @@
       <div id="water" hidden></div>
       <div class="help">
         WASD 或手柄左摇杆驾驶 · S 刹车（停稳后按住 = 倒挡 R，或按住右下「倒车」）· RT/LT 油门/刹车 · Q/E 换档 · C 视角 · Space 手刹 · R 复位<br />
-        1–4 换工具 · 按住 T 开工具轮盘（手柄 View + 方向）· Backspace 丢下当前工具<br />
+        1–4 换工具 · 按住 T 开工具轮盘（手柄 View + 方向）· Backspace 丢下当前工具 · 第一趟任务卡可「重开」<br />
         木板：G 架桥（两端都要有支撑）· 千斤顶：侧翻后按住 J 3 s（坡度 &lt; 15°）· 维修包：停稳按住 G 2 s · 车况 +35<br />
         绞盘：G 挂钩/松绳 · 按住 F 收绳 · X 换锚 · V 自动锚 · H 张力条<br />
         W5：P 拍照（滚轮 FOV · [ ] 曝光 · 1–5 滤镜 · 空格快门）· N 时间加速 ×8 · B 天气 · 木屋自动存档<br />
+        第一趟：从出生点出发，按任务卡目标跑完；山脊拍照后回木屋完成，最多约 20 分钟<br />
         右键拖动看 · 滚轮缩放 · Esc 设置 · 按键没反应？点一下画面，并把输入法切到英文
       </div>
     </div>
 
     <div id="worldNotice" hidden></div>
+
+    <div id="missionHud" hidden aria-live="polite">
+      <div class="mission-head">
+        <span class="mission-tag">第一趟</span>
+        <span id="missionTimer">00:00</span>
+        <button id="missionRestart" type="button" title="从起点重新开始第一趟">重开</button>
+      </div>
+      <div id="missionObjective">目标 1/5</div>
+      <div id="missionHint"></div>
+      <div id="missionChecklist"></div>
+    </div>
+
+    <div id="missionIntro" hidden>
+      <div class="mission-card">
+        <div class="mission-kicker">DIRECTED RUN · W5</div>
+        <h1>第一趟</h1>
+        <p class="mission-lead">从木屋旁的出生点出发，跑完这趟 10–20 分钟的山路。</p>
+        <ol class="mission-brief">
+          <li>向东出闸，在 W4 试炼区架木板过 2 m 沟。</li>
+          <li>上侧翻坡按住 J 3 s 翻正，或撞一下后用维修包修好。</li>
+          <li>回出生点旁挂住「起手锚点」，用绞盘收绳自救（或去 W3 试炼）。</li>
+          <li>上到山脊观景点，按 P 拍照、空格快门。</li>
+          <li>从山脊南侧下坡绕回木屋检查点，完成并保存本趟。</li>
+        </ol>
+        <p class="mission-meta">木屋自动存档 · R 回起点 · 拍照 P · 本趟不使用任何调试传送</p>
+        <button id="missionStart" type="button">开始第一趟（Enter）</button>
+      </div>
+    </div>
+
+    <div id="missionComplete" hidden>
+      <div class="mission-card">
+        <div class="mission-kicker">FIRST RUN COMPLETE</div>
+        <h1>第一趟完成</h1>
+        <div id="missionCompleteTime" class="mission-time">00:00</div>
+        <img id="missionPhoto" alt="第一趟 · 山脊观景点照片" hidden />
+        <p id="missionCompleteSummary"></p>
+        <div class="mission-actions">
+          <button id="missionReplay" type="button">再跑一趟（Enter）</button>
+          <button id="missionFree" type="button">自由驾驶</button>
+        </div>
+      </div>
+    </div>
 
     <div id="winchPrompt" hidden></div>
 
@@ -73,6 +117,7 @@
       <span><kbd>F</kbd> 收绳</span>
       <span><kbd>H</kbd> 张力</span>
       <span><kbd>P</kbd> 拍照</span>
+      <span><kbd>第一趟</kbd> 任务卡</span>
       <span><kbd>N</kbd> 时间</span>
       <span><kbd>B</kbd> 天气</span>
       <span id="buildTag" class="build-tag"></span>
